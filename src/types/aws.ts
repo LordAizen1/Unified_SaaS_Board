@@ -1,15 +1,20 @@
 export interface AWSCostData {
+  ResultsByTime: AWSIndividualCostData[];
+  DimensionValueAttributes: any[]; // Or define a more specific interface if needed
+}
+
+export interface AWSIndividualCostData {
   TimePeriod: {
     Start: string;
     End: string;
   };
-  Total: {
+  Total?: {
     UnblendedCost: {
       Amount: string;
       Unit: string;
     };
   };
-  Groups: {
+  Groups?: {
     Keys: string[];
     Metrics: {
       UnblendedCost: {
@@ -18,6 +23,7 @@ export interface AWSCostData {
       };
     };
   }[];
+  Estimated?: boolean;
 }
 
 export interface AWSCostSummary {
@@ -28,6 +34,7 @@ export interface AWSCostSummary {
       unit: string;
     };
   };
+  costsByDate: Record<string, { serviceName: string; cost: number; }[]>;
   timeRange: {
     start: string;
     end: string;

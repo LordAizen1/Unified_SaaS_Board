@@ -10,50 +10,32 @@ import {
 
 // Generate mock categories
 export const categories: Category[] = [
-  { id: 'cat-1', name: 'Compute', color: '#3B82F6' },
-  { id: 'cat-2', name: 'Storage', color: '#10B981' },
-  { id: 'cat-3', name: 'Database', color: '#8B5CF6' },
-  { id: 'cat-4', name: 'Networking', color: '#F59E0B' },
-  { id: 'cat-5', name: 'Analytics', color: '#EC4899' },
-  { id: 'cat-6', name: 'AI/ML', color: '#06B6D4' },
+  { id: 'cat-1', name: 'Cloud Infrastructure', color: '#3B82F6' },
+  { id: 'cat-2', name: 'AI/ML Services', color: '#10B981' },
+  { id: 'cat-3', name: 'Observability', color: '#8B5CF6' },
 ];
 
 // Generate mock services
 export const services: Service[] = [
-  { id: 'svc-1', name: 'EC2 Instances', categoryId: 'cat-1' },
-  { id: 'svc-2', name: 'Lambda Functions', categoryId: 'cat-1' },
-  { id: 'svc-3', name: 'S3 Storage', categoryId: 'cat-2' },
-  { id: 'svc-4', name: 'EBS Volumes', categoryId: 'cat-2' },
-  { id: 'svc-5', name: 'RDS Instances', categoryId: 'cat-3' },
-  { id: 'svc-6', name: 'DynamoDB', categoryId: 'cat-3' },
-  { id: 'svc-7', name: 'API Gateway', categoryId: 'cat-4' },
-  { id: 'svc-8', name: 'CloudFront', categoryId: 'cat-4' },
-  { id: 'svc-9', name: 'Athena', categoryId: 'cat-5' },
-  { id: 'svc-10', name: 'QuickSight', categoryId: 'cat-5' },
-  { id: 'svc-11', name: 'SageMaker', categoryId: 'cat-6' },
-  { id: 'svc-12', name: 'Rekognition', categoryId: 'cat-6' },
-  { id: 'svc-13', name: 'OpenAI API', categoryId: 'cat-6' },
-  { id: 'svc-14', name: 'Cursor AI', categoryId: 'cat-6' },
+  { id: 'aws', name: 'AWS', categoryId: 'cat-1' },
+  { id: 'gcp', name: 'Google Cloud', categoryId: 'cat-1' },
+  { id: 'anthropic', name: 'Anthropic', categoryId: 'cat-2' },
+  { id: 'openai', name: 'OpenAI', categoryId: 'cat-2' },
+  { id: 'datadog', name: 'Datadog', categoryId: 'cat-3' },
 ];
 
 // Generate mock teams
 export const teams: Team[] = [
   { id: 'team-1', name: 'Engineering' },
-  { id: 'team-2', name: 'Marketing' },
-  { id: 'team-3', name: 'Sales' },
-  { id: 'team-4', name: 'Finance' },
-  { id: 'team-5', name: 'Product' },
+  { id: 'team-2', name: 'Data Science' },
+  { id: 'team-3', name: 'Platform' },
 ];
 
 // Generate mock projects
 export const projects: Project[] = [
-  { id: 'proj-1', name: 'Web Platform', teamId: 'team-1' },
-  { id: 'proj-2', name: 'Mobile App', teamId: 'team-1' },
-  { id: 'proj-3', name: 'Data Pipeline', teamId: 'team-1' },
-  { id: 'proj-4', name: 'Campaign Analytics', teamId: 'team-2' },
-  { id: 'proj-5', name: 'Lead Generation', teamId: 'team-3' },
-  { id: 'proj-6', name: 'Reporting System', teamId: 'team-4' },
-  { id: 'proj-7', name: 'Customer Dashboard', teamId: 'team-5' },
+  { id: 'proj-1', name: 'Core Platform', teamId: 'team-1' },
+  { id: 'proj-2', name: 'AI Services', teamId: 'team-2' },
+  { id: 'proj-3', name: 'Infrastructure', teamId: 'team-3' },
 ];
 
 // Tags pool
@@ -105,7 +87,7 @@ export const generateExpenses = (count: number = 500): Expense[] => {
     const environment = randomItem(environments);
     
     // Higher amounts for production, lower for dev
-    const baseAmount = randomNumber(5, 500);
+    const baseAmount = randomNumber(100, 1000);
     const multiplier = environment === 'prod' ? 3 : environment === 'staging' ? 1.5 : 1;
     
     const expense: Expense = {
@@ -173,7 +155,103 @@ export const generateMonthlyTrends = () => {
 
 // Generate mock data for export
 export const mockData = {
-  expenses: generateExpenses(),
+  expenses: [
+    {
+      id: '1',
+      timestamp: '2024-03-01T00:00:00Z',
+      amount: 2500.00,
+      serviceId: 'aws',
+      serviceName: 'AWS',
+      categoryId: 'cat-1',
+      categoryName: 'Cloud Infrastructure',
+      teamId: 'team-1',
+      teamName: 'Engineering',
+      projectId: 'proj-1',
+      projectName: 'Core Platform',
+      environment: 'prod' as Environment,
+      tags: ['production', 'compute', 'storage'],
+      usageMetrics: [
+        { type: 'compute-hours', value: 720, unit: 'hours' },
+        { type: 'storage-gb', value: 500, unit: 'GB' }
+      ]
+    },
+    {
+      id: '2',
+      timestamp: '2024-03-01T00:00:00Z',
+      amount: 1800.00,
+      serviceId: 'gcp',
+      serviceName: 'Google Cloud',
+      categoryId: 'cat-1',
+      categoryName: 'Cloud Infrastructure',
+      teamId: 'team-1',
+      teamName: 'Engineering',
+      projectId: 'proj-1',
+      projectName: 'Core Platform',
+      environment: 'prod' as Environment,
+      tags: ['production', 'compute', 'storage'],
+      usageMetrics: [
+        { type: 'compute-hours', value: 600, unit: 'hours' },
+        { type: 'storage-gb', value: 300, unit: 'GB' }
+      ]
+    },
+    {
+      id: '3',
+      timestamp: '2024-03-01T00:00:00Z',
+      amount: 1200.00,
+      serviceId: 'anthropic',
+      serviceName: 'Anthropic',
+      categoryId: 'cat-2',
+      categoryName: 'AI/ML Services',
+      teamId: 'team-2',
+      teamName: 'Data Science',
+      projectId: 'proj-2',
+      projectName: 'AI Services',
+      environment: 'prod' as Environment,
+      tags: ['production', 'ai', 'ml'],
+      usageMetrics: [
+        { type: 'api-calls', value: 50000, unit: 'calls' },
+        { type: 'tokens', value: 1000000, unit: 'tokens' }
+      ]
+    },
+    {
+      id: '4',
+      timestamp: '2024-03-01T00:00:00Z',
+      amount: 1500.00,
+      serviceId: 'openai',
+      serviceName: 'OpenAI',
+      categoryId: 'cat-2',
+      categoryName: 'AI/ML Services',
+      teamId: 'team-2',
+      teamName: 'Data Science',
+      projectId: 'proj-2',
+      projectName: 'AI Services',
+      environment: 'prod' as Environment,
+      tags: ['production', 'ai', 'ml'],
+      usageMetrics: [
+        { type: 'api-calls', value: 75000, unit: 'calls' },
+        { type: 'tokens', value: 1500000, unit: 'tokens' }
+      ]
+    },
+    {
+      id: '5',
+      timestamp: '2024-03-01T00:00:00Z',
+      amount: 800.00,
+      serviceId: 'datadog',
+      serviceName: 'Datadog',
+      categoryId: 'cat-3',
+      categoryName: 'Observability',
+      teamId: 'team-3',
+      teamName: 'Platform',
+      projectId: 'proj-3',
+      projectName: 'Infrastructure',
+      environment: 'prod' as Environment,
+      tags: ['production', 'monitoring', 'observability'],
+      usageMetrics: [
+        { type: 'hosts-monitored', value: 50, unit: 'hosts' },
+        { type: 'custom-metrics', value: 1000, unit: 'metrics' }
+      ]
+    }
+  ],
   categories,
   services,
   teams,

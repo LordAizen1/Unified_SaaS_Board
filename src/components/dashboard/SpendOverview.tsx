@@ -16,6 +16,8 @@ import {
   Title,
   Tooltip
 } from 'chart.js';
+import { useAWSCosts } from '../../context/AWSCostContext';
+import { format, parseISO, isValid } from 'date-fns';
 
 // Register ChartJS components
 ChartJS.register(
@@ -32,12 +34,20 @@ ChartJS.register(
 const SpendOverview: React.FC = () => {
   const { filters } = useFilters();
   const { theme } = useTheme();
+  const { costSummary: awsCostSummary, isLoading: awsLoading, error: awsError } = useAWSCosts();
   const [showDetails, setShowDetails] = useState(false);
   
   // Filter expenses based on current filters
   const filteredExpenses = useMemo(() => {
     return filterExpenses(mockData.expenses, filters);
   }, [filters]);
+  
+  // Calculate total spend
+  const totalSpend = useMemo(() => {
+    const mockTotal = filteredExpenses.reduce((sum, expense) => sum + expense.amount, 0);
+    const awsTotal = awsCostSummary ? awsCostSummary.totalCost : 0;
+    return mockTotal + awsTotal;
+  }, [filteredExpenses, awsCostSummary]);
   
   // Calculate MoM change
   const momChange = useMemo(() => {
@@ -54,33 +64,97 @@ const SpendOverview: React.FC = () => {
     }).format(amount);
   };
   
+  // Helper to format dates, handling invalid dates
+  const formatDate = (dateString: string) => {
+    try {
+      const date = parseISO(dateString);
+      if (!isValid(date)) {
+        return 'N/A';
+      }
+      return format(date, 'MMM d, yyyy');
+    } catch (err) {
+      console.error('Error formatting date:', err);
+      return 'N/A';
+    }
+  };
+
   // Generate daily spend data for the mini chart
   const dailySpendData = useMemo(() => {
     const dailyTotals: Record<string, number> = {};
-    const days = 14; // Show last 14 days
-    
-    // Initialize all days with 0
-    for (let i = days - 1; i >= 0; i--) {
-      const date = new Date();
-      date.setDate(date.getDate() - i);
-      const dateString = date.toISOString().split('T')[0];
-      dailyTotals[dateString] = 0;
+    const startDate = filters.dateRange[0];
+    const endDate = filters.dateRange[1];
+
+    console.log('SpendOverview: Filter Start Date:', startDate);
+    console.log('SpendOverview: Filter End Date:', endDate);
+
+    if (!startDate || !endDate || !isValid(startDate) || !isValid(endDate)) {
+      console.log('SpendOverview: Invalid date range, returning empty data.');
+      return { labels: [], data: [] };
     }
+
+    const dates: Date[] = [];
+    for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
+      dates.push(new Date(d));
+    }
+    console.log('SpendOverview: Generated dates array length:', dates.length);
+    console.log('SpendOverview: First generated date:', dates[0]);
+    console.log('SpendOverview: Last generated date:', dates[dates.length - 1]);
+
+    // Initialize all days within the selected range with 0
+    dates.forEach(date => {
+      const dateString = format(date, 'yyyy-MM-dd');
+      dailyTotals[dateString] = 0;
+    });
     
     // Sum expenses by day
     filteredExpenses.forEach(expense => {
-      const dateString = new Date(expense.timestamp).toISOString().split('T')[0];
+      const expenseDate = new Date(expense.timestamp);
+      const dateString = format(expenseDate, 'yyyy-MM-dd');
       if (dailyTotals[dateString] !== undefined) {
         dailyTotals[dateString] += expense.amount;
       }
     });
+
+    // Add AWS costs to daily totals if available
+    if (awsCostSummary && awsCostSummary.timeRange.start && awsCostSummary.timeRange.end) {
+      const awsStartDate = parseISO(awsCostSummary.timeRange.start);
+      const awsEndDate = parseISO(awsCostSummary.timeRange.end);
+
+      console.log('SpendOverview: AWS Summary Start Date:', awsStartDate);
+      console.log('SpendOverview: AWS Summary End Date:', awsEndDate);
+
+      if (isValid(awsStartDate) && isValid(awsEndDate)) {
+        // Iterate through dates within the AWS cost summary time range
+        // and use the actual daily costs from awsCostSummary.costsByDate
+        for (let d = new Date(awsStartDate); d <= awsEndDate; d.setDate(d.getDate() + 1)) {
+          const dateString = format(d, 'yyyy-MM-dd');
+          const dailyAwsServiceCosts = awsCostSummary.costsByDate[dateString];
+          let dailyTotalAwsCost = 0;
+
+          if (dailyAwsServiceCosts && Array.isArray(dailyAwsServiceCosts)) {
+            dailyAwsServiceCosts.forEach(item => {
+              dailyTotalAwsCost += item.cost;
+            });
+          }
+
+          if (dailyTotals[dateString] !== undefined) {
+            dailyTotals[dateString] += dailyTotalAwsCost;
+          } else if (d >= startDate && d <= endDate) { 
+            // Only add if within the selected filter range and not already initialized from mock data
+            dailyTotals[dateString] = dailyTotalAwsCost;
+          }
+        }
+      }
+    }
+    console.log('SpendOverview: Final dailyTotals keys count:', Object.keys(dailyTotals).length);
+    console.log('SpendOverview: Final dailyTotals:', dailyTotals);
+
+    // Convert to arrays for chart, ensuring dates are sorted
+    const sortedLabels = Object.keys(dailyTotals).sort();
+    const data = sortedLabels.map(label => dailyTotals[label]);
     
-    // Convert to arrays for chart
-    const labels = Object.keys(dailyTotals);
-    const data = Object.values(dailyTotals);
-    
-    return { labels, data };
-  }, [filteredExpenses]);
+    return { labels: sortedLabels, data };
+  }, [filteredExpenses, awsCostSummary, filters.dateRange]);
   
   // Chart options and data
   const chartData = {
@@ -167,90 +241,64 @@ const SpendOverview: React.FC = () => {
           </button>
         </div>
         
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="col-span-1 md:col-span-2">
-            <div className="flex flex-col">
-              <div className="text-3xl font-bold mb-2 dark:text-white">
-                {formatCurrency(momChange.currentMonth)}
-              </div>
-              
-              <div className="flex items-center">
-                <div className={`flex items-center ${
-                  momChange.percentageChange < 0 
-                    ? 'text-green-600 dark:text-green-400' 
-                    : 'text-red-600 dark:text-red-400'
-                }`}>
-                  {momChange.percentageChange < 0 ? (
-                    <TrendingDown size={16} className="mr-1" />
-                  ) : (
-                    <TrendingUp size={16} className="mr-1" />
-                  )}
-                  <span className="text-sm font-medium">
-                    {Math.abs(momChange.percentageChange).toFixed(1)}%
-                  </span>
-                </div>
-                
-                <span className="text-sm text-gray-500 dark:text-gray-400 ml-2">
-                  vs previous month ({formatCurrency(momChange.previousMonth)})
-                </span>
-              </div>
-              
-              <button
-                onClick={() => setShowDetails(!showDetails)}
-                className={`flex items-center text-sm mt-4 ${
-                  theme.isDarkMode ? 'text-blue-400' : 'text-blue-600'
-                }`}
-              >
-                {showDetails ? 'Hide' : 'Show'} details
-                {showDetails ? (
-                  <ChevronUp size={16} className="ml-1" />
-                ) : (
-                  <ChevronDown size={16} className="ml-1" />
-                )}
-              </button>
-              
-              {showDetails && (
-                <div className="mt-4 space-y-3">
-                  <div className={`p-3 rounded-md ${
-                    theme.isDarkMode ? 'bg-gray-700' : 'bg-gray-50'
-                  }`}>
-                    <div className="flex justify-between items-center">
-                      <div className="text-sm dark:text-gray-300">Daily Average</div>
-                      <div className="font-medium dark:text-white">
-                        {formatCurrency(momChange.currentMonth / 30)}
-                      </div>
-                    </div>
-                  </div>
-                  
-                  <div className={`p-3 rounded-md ${
-                    theme.isDarkMode ? 'bg-gray-700' : 'bg-gray-50'
-                  }`}>
-                    <div className="flex justify-between items-center">
-                      <div className="text-sm dark:text-gray-300">Projected Monthly</div>
-                      <div className="font-medium dark:text-white">
-                        {formatCurrency(momChange.currentMonth * 1.1)}
-                      </div>
-                    </div>
-                  </div>
-                  
-                  <div className={`p-3 rounded-md ${
-                    theme.isDarkMode ? 'bg-gray-700' : 'bg-gray-50'
-                  }`}>
-                    <div className="flex justify-between items-center">
-                      <div className="text-sm dark:text-gray-300">Year-to-Date</div>
-                      <div className="font-medium dark:text-white">
-                        {formatCurrency(momChange.currentMonth * 8.5)}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
+        <div className="flex flex-col md:flex-row gap-6 items-center">
+          <div className="flex-1">
+            <div className={`text-4xl font-bold ${
+              theme.isDarkMode ? 'text-white' : 'text-gray-900'
+            } mb-2`}>
+              {formatCurrency(totalSpend)}
             </div>
+            <div className="flex items-center text-sm mb-4">
+              {momChange.percentageChange !== 0 && (
+                <span className={`flex items-center mr-2 ${
+                  momChange.percentageChange > 0 ? 'text-red-500' : 'text-green-500'
+                }`}>
+                  {momChange.percentageChange > 0 ? <TrendingUp size={16} /> : <TrendingDown size={16} />}
+                  <span className="ml-1">{Math.abs(momChange.percentageChange).toFixed(1)}%</span>
+                </span>
+              )}
+              <span className={`${theme.isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                vs previous month ({formatCurrency(momChange.previousMonth)})
+              </span>
+            </div>
+            
+            <button
+              onClick={() => setShowDetails(!showDetails)}
+              className={`text-sm font-medium flex items-center ${
+                theme.isDarkMode ? 'text-blue-400 hover:text-blue-300' : 'text-blue-600 hover:text-blue-700'
+              }`}
+            >
+              View Details {showDetails ? <ChevronUp size={16} className="ml-1" /> : <ChevronDown size={16} className="ml-1" />}
+            </button>
+
+            {showDetails && (
+              <div className={`mt-6 p-4 rounded-md ${
+                theme.isDarkMode ? 'bg-gray-700' : 'bg-gray-100'
+              }`}>
+                <h3 className={`text-md font-semibold mb-3 ${
+                  theme.isDarkMode ? 'text-white' : 'text-gray-800'
+                }`}>
+                  Additional Spend Metrics
+                </h3>
+                <ul className={`text-sm space-y-2 ${
+                  theme.isDarkMode ? 'text-gray-300' : 'text-gray-600'
+                }`}>
+                  <li>Mock Data Total: {formatCurrency(filteredExpenses.reduce((sum, e) => sum + e.amount, 0))}</li>
+                  <li>AWS Total Cost: {awsCostSummary ? formatCurrency(awsCostSummary.totalCost) : 'N/A'}</li>
+                  <li>AWS Time Period: {awsCostSummary && awsCostSummary.timeRange.start && awsCostSummary.timeRange.end
+                    ? `${formatDate(awsCostSummary.timeRange.start)} - ${formatDate(awsCostSummary.timeRange.end)}`
+                    : 'N/A'
+                  }</li>
+                  {awsLoading && <li>Loading AWS costs...</li>}
+                  {awsError && <li className="text-red-400">Error fetching AWS costs: {awsError}</li>}
+                </ul>
+              </div>
+            )}
           </div>
           
-          <div className="h-24">
-            <div className="h-full" id="spend-trend-chart">
-              <Line data={chartData} options={chartOptions} />
+          <div className="flex-1 h-40">
+            <div className="h-32">
+              <Line id="spend-trend-chart" data={chartData} options={chartOptions} />
             </div>
           </div>
         </div>

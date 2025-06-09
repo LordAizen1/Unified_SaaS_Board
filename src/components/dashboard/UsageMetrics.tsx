@@ -12,8 +12,11 @@ import {
 import { Download } from 'lucide-react';
 import { useFilters } from '../../context/FilterContext';
 import { useTheme } from '../../context/ThemeContext';
-import { calculateExpensesByService, calculateUnitEconomics, filterExpenses } from '../../utils/dataTransformers';
+import { calculateUnitEconomics, filterExpenses } from '../../utils/dataTransformers';
 import mockData from '../../utils/mockData';
+import { useAWSCosts } from '../../context/AWSCostContext';
+import { Expense, Environment, UsageMetric } from '../../types';
+import { AWSCostSummary } from '../../types/aws';
 
 // Register ChartJS components
 ChartJS.register(
@@ -28,39 +31,157 @@ ChartJS.register(
 const UsageMetrics: React.FC = () => {
   const { filters } = useFilters();
   const { theme } = useTheme();
-  const [selectedService, setSelectedService] = useState<string>('');
-  
-  // Filter expenses based on current filters
-  const filteredExpenses = useMemo(() => {
-    return filterExpenses(mockData.expenses, filters);
-  }, [filters]);
-  
-  // Get services for dropdown
-  const serviceOptions = useMemo(() => {
-    return calculateExpensesByService(filteredExpenses)
-      .slice(0, 10); // Only show top 10
-  }, [filteredExpenses]);
-  
-  // Filter expenses by selected service
-  const serviceExpenses = useMemo(() => {
-    if (!selectedService) {
-      return filteredExpenses;
+  const { costSummary: awsCostSummary } = useAWSCosts();
+  const [selectedService, setSelectedService] = useState<string>('all-services');
+
+  // Define the main services for the dropdown
+  const mainServices = useMemo(() => {
+    return [
+      { id: 'all-services', name: 'All Services' }, // Option for aggregated view
+      { id: 'aws', name: 'AWS' },
+      { id: 'gcp', name: 'GCP' },
+      { id: 'anthropic', name: 'Anthropic' },
+      { id: 'datadog', name: 'Datadog' },
+      { id: 'openai', name: 'OpenAI' },
+    ];
+  }, []);
+
+  // Combine mock and AWS expenses for usage metrics
+  const combinedExpenses = useMemo(() => {
+    let allRawExpenses: Expense[] = [...mockData.expenses];
+
+    if (awsCostSummary) {
+      // Add AWS expenses from daily service costs for granular sub-service data
+      Object.entries(awsCostSummary.costsByDate).forEach(([date, dailyServiceCosts]) => {
+        dailyServiceCosts.forEach(item => {
+          const awsCategory = mockData.categories.find(cat => cat.name === 'Cloud Infrastructure');
+          if (awsCategory) {
+            console.log('UsageMetrics: Found awsCategory:', awsCategory);
+            allRawExpenses.push({
+              id: `aws-${item.serviceName}-${date}`,
+              timestamp: date,
+              amount: parseFloat(item.cost.toFixed(2)),
+              serviceId: item.serviceName, // AWS Service name (e.g., 'Amazon EC2')
+              serviceName: item.serviceName,
+              categoryId: awsCategory.id, // This is 'cat-1'
+              categoryName: awsCategory.name, // This is 'Cloud Infrastructure'
+              teamId: 'aws-team',
+              teamName: 'Cloud Providers',
+              projectId: 'aws-project',
+              projectName: 'AWS Metrics',
+              environment: 'prod' as Environment,
+              tags: ['aws', 'cloud', 'usage'],
+              usageMetrics: [
+                { type: `aws-${item.serviceName.toLowerCase().replace(/[^a-z0-9]/g, '-')}-cost`, value: 1 } // Unique metric for each AWS service
+              ],
+            });
+            console.log('UsageMetrics: Pushed AWS Expense:', { id: `aws-${item.serviceName}-${date}`, amount: parseFloat(item.cost.toFixed(2)), serviceName: item.serviceName, categoryId: awsCategory.id, timestamp: date });
+          }
+        });
+      });
     }
-    return filteredExpenses.filter(expense => expense.serviceId === selectedService);
-  }, [filteredExpenses, selectedService]);
-  
-  // Calculate unit economics
+    const filteredCombined = filterExpenses(allRawExpenses, filters);
+    console.log('UsageMetrics: combinedExpenses (after global filter): ', filteredCombined.map(e => ({ id: e.id, serviceName: e.serviceName, amount: e.amount, categoryId: e.categoryId, timestamp: e.timestamp })));
+    console.log('UsageMetrics: Total combinedExpenses amount:', filteredCombined.reduce((sum, e) => sum + e.amount, 0));
+    return filteredCombined;
+  }, [filters, awsCostSummary]);
+
+  // Get service options for the dropdown
+  const serviceOptions = useMemo(() => {
+    return mainServices;
+  }, [mainServices]);
+
+  // Filter expenses by selected service (main service or sub-service) for chart display
+  const serviceExpenses = useMemo(() => {
+    let filtered: Expense[] = [];
+    if (selectedService === 'all-services') {
+      // For 'All Services', consider all combined expenses
+      filtered = combinedExpenses;
+    } else if (selectedService === 'aws') {
+      // Filter for AWS services based on category ID (all AWS services fall under 'Cloud Infrastructure')
+      filtered = combinedExpenses.filter(expense => 
+        expense.categoryId === 'cat-1'
+      );
+    } else if (selectedService === 'gcp') {
+      // Filter for GCP services by service ID
+      filtered = combinedExpenses.filter(expense => expense.serviceId === 'gcp');
+    } else if (selectedService === 'anthropic') {
+      // Filter for Anthropic services by service ID
+      filtered = combinedExpenses.filter(expense => expense.serviceId === 'anthropic');
+    } else if (selectedService === 'datadog') {
+      // Filter for Datadog services by service ID
+      filtered = combinedExpenses.filter(expense => expense.serviceId === 'datadog');
+    } else if (selectedService === 'openai') {
+      // Filter for OpenAI services by service ID
+      filtered = combinedExpenses.filter(expense => expense.serviceId === 'openai');
+    }
+    console.log(`UsageMetrics: serviceExpenses for ${selectedService}: `, filtered.map(e => ({ id: e.id, serviceName: e.serviceName, amount: e.amount, categoryId: e.categoryId, timestamp: e.timestamp })));
+    console.log(`UsageMetrics: Total serviceExpenses amount for ${selectedService}:`, filtered.reduce((sum, e) => sum + e.amount, 0));
+    return filtered;
+  }, [combinedExpenses, selectedService]);
+
+  // Calculate unit economics based on the filtered service expenses
   const unitEconomics = useMemo(() => {
-    return calculateUnitEconomics(serviceExpenses);
-  }, [serviceExpenses]);
-  
+    if (selectedService === 'all-services') {
+      // Aggregate costs by main service categories
+      const aggregatedCosts: Record<string, number> = {};
+
+      mainServices.filter(s => s.id !== 'all-services').forEach(mainService => {
+        let totalCostForMainService = 0;
+        if (mainService.id === 'aws') {
+          combinedExpenses.filter(expense => expense.categoryId === 'cat-1').forEach(expense => {
+            totalCostForMainService += expense.amount;
+          });
+        } else if (mainService.id === 'gcp') {
+          combinedExpenses.filter(expense => expense.serviceId === 'gcp').forEach(expense => {
+            totalCostForMainService += expense.amount;
+          });
+        } else if (mainService.id === 'anthropic') {
+          combinedExpenses.filter(expense => expense.serviceId === 'anthropic').forEach(expense => {
+            totalCostForMainService += expense.amount;
+          });
+        } else if (mainService.id === 'datadog') {
+          combinedExpenses.filter(expense => expense.serviceId === 'datadog').forEach(expense => {
+            totalCostForMainService += expense.amount;
+          });
+        } else if (mainService.id === 'openai') {
+          combinedExpenses.filter(expense => expense.serviceId === 'openai').forEach(expense => {
+            totalCostForMainService += expense.amount;
+          });
+        } else {
+           // For other mock data services, if they exist outside the main categories
+           combinedExpenses.filter(expense => {
+            const service = mockData.services.find(s => s.id === expense.serviceId);
+            // Ensure we're only including mock services not explicitly listed as main services
+            return service && !mainServices.some(ms => ms.id === expense.serviceId);
+           }).forEach(expense => {
+              totalCostForMainService += expense.amount;
+           });
+        }
+        aggregatedCosts[mainService.name] = totalCostForMainService;
+      });
+      console.log('UsageMetrics: unitEconomics for All Services:', aggregatedCosts);
+      return aggregatedCosts;
+
+    } else {
+      // When a specific main service is selected, calculate unit economics for its sub-services.
+      const subServiceCosts: Record<string, number> = {}; // Changed to number for simplicity
+      serviceExpenses.forEach(expense => {
+        // Group by sub-service name
+        subServiceCosts[expense.serviceName] = (subServiceCosts[expense.serviceName] || 0) + expense.amount;
+      });
+      console.log(`UsageMetrics: unitEconomics for ${selectedService}:`, subServiceCosts);
+      return subServiceCosts;
+    }
+  }, [combinedExpenses, serviceExpenses, selectedService, mainServices]);
+
   // Format currency
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
       currency: 'USD',
-      minimumFractionDigits: amount < 0.01 ? 6 : 2,
-      maximumFractionDigits: amount < 0.01 ? 6 : 2,
+      minimumFractionDigits: amount < 0.01 && amount !== 0 ? 6 : 0,
+      maximumFractionDigits: amount < 0.01 && amount !== 0 ? 6 : 0,
     }).format(amount);
   };
   
@@ -80,31 +201,41 @@ const UsageMetrics: React.FC = () => {
     }
   };
   
-  // Get service name
-  const getServiceName = (serviceId: string) => {
-    const service = mockData.services.find(s => s.id === serviceId);
-    return service ? service.name : 'All Services';
-  };
-  
+  // Get service name for title/label
+  const getDisplayTitle = useMemo(() => {
+    if (selectedService === 'all-services') {
+      return 'All Services';
+    }
+    return mainServices.find(s => s.id === selectedService)?.name || 'Selected Service';
+  }, [selectedService, mainServices]);
+
+  const getDisplayValue = useMemo(() => {
+    const total = Object.values(unitEconomics).reduce((sum, cost) => sum + cost, 0);
+    return formatCurrency(total);
+  }, [unitEconomics, formatCurrency]);
+
   // Prepare chart data
   const chartData = useMemo(() => {
-    const metricTypes = Object.keys(unitEconomics);
-    const serviceName = selectedService ? 
-      getServiceName(selectedService) : 'All Services';
+    const labels = Object.keys(unitEconomics);
+    const data = Object.values(unitEconomics);
     
+    const datasetLabel = selectedService === 'all-services'
+      ? 'Cost per Main Service'
+      : `${getDisplayTitle} - Cost per Sub-Service`;
+
     return {
-      labels: metricTypes.map(type => type.replace('-', ' ')),
+      labels: labels,
       datasets: [
         {
-          label: `${serviceName} - Cost per Unit`,
-          data: metricTypes.map(type => unitEconomics[type]),
+          label: datasetLabel,
+          data: data,
           backgroundColor: theme.isDarkMode ? '#3B82F680' : '#3B82F6',
           borderColor: '#2563EB',
           borderWidth: 1,
         },
       ],
     };
-  }, [unitEconomics, selectedService, theme.isDarkMode]);
+  }, [unitEconomics, selectedService, getDisplayTitle, theme.isDarkMode]);
   
   // Chart options
   const chartOptions = useMemo(() => {
@@ -124,7 +255,8 @@ const UsageMetrics: React.FC = () => {
           callbacks: {
             label: (context: any) => {
               const value = context.raw;
-              return ` ${formatCurrency(value)} per unit`;
+              const label = context.label;
+              return ` ${label}: ${formatCurrency(value)}`;
             },
           },
         },
@@ -146,30 +278,14 @@ const UsageMetrics: React.FC = () => {
           },
           ticks: {
             color: theme.isDarkMode ? '#9CA3AF' : '#6B7280',
-            callback: (value: number) => {
-              return formatCurrency(value);
+            callback: function(value: number | string) {
+              return formatCurrency(Number(value));
             },
           },
         },
       },
     };
-  }, [theme.isDarkMode]);
-  
-  // Sum up total usage by metric type
-  const totalUsageByType = useMemo(() => {
-    const totals: Record<string, number> = {};
-    
-    serviceExpenses.forEach(expense => {
-      expense.usageMetrics.forEach(metric => {
-        if (!totals[metric.type]) {
-          totals[metric.type] = 0;
-        }
-        totals[metric.type] += metric.value;
-      });
-    });
-    
-    return totals;
-  }, [serviceExpenses]);
+  }, [theme.isDarkMode, formatCurrency]);
   
   return (
     <div className={`rounded-lg overflow-hidden shadow-sm ${
@@ -186,63 +302,48 @@ const UsageMetrics: React.FC = () => {
             <p className={`text-sm ${
               theme.isDarkMode ? 'text-gray-400' : 'text-gray-500'
             }`}>
-              Cost per unit metrics
+              Cost per unit analysis
             </p>
           </div>
           
-          <button
-            onClick={exportChart}
-            className={`p-2 rounded-md ${
-              theme.isDarkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-100'
-            } transition-colors duration-150`}
-            aria-label="Export chart"
-          >
-            <Download size={16} />
-          </button>
-        </div>
-        
-        <div className="mb-6">
-          <label htmlFor="service-filter" className="block text-sm font-medium mb-1 dark:text-gray-300">
-            Select Service
-          </label>
-          <select
-            id="service-filter"
-            value={selectedService}
-            onChange={(e) => setSelectedService(e.target.value)}
-            className="w-full p-2 border rounded-md text-sm bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-          >
-            <option value="">All Services</option>
-            {serviceOptions.map(service => (
-              <option key={service.serviceId} value={service.serviceId}>
-                {service.serviceName}
-              </option>
-            ))}
-          </select>
-        </div>
-        
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-          {Object.entries(unitEconomics).slice(0, 3).map(([metricType, unitCost]) => (
-            <div 
-              key={metricType}
-              className={`p-4 rounded-md ${
-                theme.isDarkMode ? 'bg-gray-700' : 'bg-gray-50'
-              }`}
+          <div className="flex items-center space-x-2">
+            <select
+              value={selectedService}
+              onChange={(e) => setSelectedService(e.target.value)}
+              className={`block w-full rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 ${theme.isDarkMode ? 'bg-gray-700 border-gray-600 text-white' : 'border-gray-300'}`}
             >
-              <div className="text-sm mb-1 capitalize dark:text-gray-300">
-                {metricType.replace('-', ' ')}
-              </div>
-              <div className="font-medium text-lg dark:text-white">
-                {formatCurrency(unitCost)}
-              </div>
-              <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                per unit ({formatNumber(totalUsageByType[metricType] || 0)} units)
-              </div>
-            </div>
-          ))}
+              {serviceOptions.map(option => (
+                <option key={option.id} value={option.id}>
+                  {option.name}
+                </option>
+              ))}
+            </select>
+
+            <button
+              onClick={exportChart}
+              className={`p-2 rounded-md ${theme.isDarkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-100'} transition-colors duration-150`}
+              aria-label="Export chart"
+            >
+              <Download size={16} />
+            </button>
+          </div>
         </div>
         
-        <div className="h-64 md:h-80" id="usage-metrics-chart">
-          <Bar data={chartData} options={chartOptions} />
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
+          <div className={`p-4 rounded-md shadow ${theme.isDarkMode ? 'bg-gray-700' : 'bg-gray-50'}`}>
+            <p className={`text-sm font-medium ${theme.isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>Total {getDisplayTitle} Cost</p>
+            <p className={`text-xl font-bold ${theme.isDarkMode ? 'text-white' : 'text-gray-900'}`}>{getDisplayValue}</p>
+          </div>
+        </div>
+
+        <div className="h-80">
+          {Object.keys(unitEconomics).length > 0 ? (
+            <Bar data={chartData} options={chartOptions} />
+          ) : (
+            <div className={`flex items-center justify-center h-full ${theme.isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+              No usage metrics available for the selected service/period.
+            </div>
+          )}
         </div>
       </div>
     </div>

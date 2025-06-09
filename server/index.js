@@ -18,13 +18,25 @@ app.get('/api/aws/costs', async (req, res) => {
     const secretAccessKey = req.headers['x-aws-secret-key'];
     const region = req.headers['x-aws-region'];
 
-    console.log('Received AWS request with params:', { start_date, end_date, region });
-    console.log('AWS credentials present:', !!accessKeyId && !!secretAccessKey);
+    console.log('=== AWS Cost Request Details ===');
+    console.log('Query Parameters:', { start_date, end_date });
+    console.log('Headers:', {
+      'x-aws-access-key': accessKeyId ? 'present' : 'missing',
+      'x-aws-secret-key': secretAccessKey ? 'present' : 'missing',
+      'x-aws-region': region || 'not specified'
+    });
 
     if (!accessKeyId || !secretAccessKey) {
+      console.log('Error: Missing AWS credentials');
       return res.status(401).json({ error: 'AWS credentials are required' });
     }
 
+    if (!start_date || !end_date) {
+      console.log('Error: Missing date parameters');
+      return res.status(400).json({ error: 'Start date and end date are required' });
+    }
+
+    console.log('Initializing AWS Cost Explorer client...');
     const costExplorer = new CostExplorer({
       credentials: {
         accessKeyId,
@@ -33,31 +45,45 @@ app.get('/api/aws/costs', async (req, res) => {
       region: region || 'us-east-1',
     });
 
-    const params = {
-      TimePeriod: {
-        Start: start_date,
-        End: end_date,
-      },
-      Granularity: 'MONTHLY',
-      Metrics: ['UnblendedCost'],
-      GroupBy: [
-        {
-          Type: 'DIMENSION',
-          Key: 'SERVICE',
+    const results = [];
+    let nextToken = undefined;
+
+    do {
+      const params = {
+        TimePeriod: {
+          Start: start_date,
+          End: end_date,
         },
-      ],
-    };
+        Granularity: 'DAILY',
+        Metrics: ['UnblendedCost'],
+        GroupBy: [
+          {
+            Type: 'DIMENSION',
+            Key: 'SERVICE',
+          },
+        ],
+        NextPageToken: nextToken,
+      };
 
-    console.log('Making request to AWS Cost Explorer...');
-    const response = await costExplorer.getCostAndUsage(params);
+      console.log('Making request to AWS Cost Explorer with params:', JSON.stringify(params, null, 2));
+      const response = await costExplorer.getCostAndUsage(params);
+      console.log('AWS Cost Explorer response received successfully for a page.');
 
-    console.log('AWS Cost Explorer response received');
-    res.json(response);
+      results.push(...response.ResultsByTime);
+      nextToken = response.NextPageToken;
+
+    } while (nextToken);
+    
+    console.log(`AWS Cost Explorer: Fetched ${results.length} daily entries.`);
+    res.json({ ResultsByTime: results });
   } catch (error) {
-    console.error('Detailed AWS error:', {
+    console.error('=== AWS Cost Explorer Error ===');
+    console.error('Error details:', {
       message: error.message,
       code: error.code,
       requestId: error.$metadata?.requestId,
+      httpStatusCode: error.$metadata?.httpStatusCode,
+      stack: error.stack
     });
 
     res.status(error.$metadata?.httpStatusCode || 500).json({

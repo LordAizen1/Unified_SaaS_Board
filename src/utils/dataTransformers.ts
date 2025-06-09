@@ -1,4 +1,4 @@
-import { addMonths, format, parseISO, startOfMonth, subMonths } from 'date-fns';
+import { addMonths, format, parseISO, startOfMonth, subMonths, differenceInCalendarMonths } from 'date-fns';
 import { 
   CostAllocationNode, 
   Expense, 
@@ -172,14 +172,22 @@ export const calculateExpensesByService = (
 // Generate monthly trend data
 export const generateTrendData = (
   expenses: Expense[],
-  months: number = 6
+  months: number = 6,
+  endDate: Date = new Date()
 ): MonthlyExpense[] => {
+  console.log('--- generateTrendData Debugging ---');
+  console.log('Input expenses count:', expenses.length);
+  console.log('Requested months:', months);
+  console.log('Provided endDate (from filters):', endDate);
+
   const result: MonthlyExpense[] = [];
-  const today = new Date();
   
-  // Initialize result array with empty months
-  for (let i = months - 1; i >= 0; i--) {
-    const monthDate = subMonths(today, i);
+  // Initialize result array with empty months, starting from the calculated start of the trend period
+  const trendStartDate = subMonths(startOfMonth(endDate), months - 1);
+  console.log('Calculated trendStartDate:', trendStartDate);
+
+  for (let i = 0; i < months; i++) {
+    const monthDate = addMonths(trendStartDate, i);
     const monthString = format(monthDate, 'MMM yyyy');
     
     result.push({
@@ -188,37 +196,34 @@ export const generateTrendData = (
       byCategory: {}
     });
   }
+  console.log('Initialized result array (empty months):', JSON.stringify(result, null, 2));
   
   // Group expenses by month and category
   expenses.forEach(expense => {
     const expenseDate = parseISO(expense.timestamp);
-    const monthIndex = months - 1 - Math.floor(
-      (today.getTime() - expenseDate.getTime()) / 
-      (30 * 24 * 60 * 60 * 1000)
-    );
+    console.log(`Processing expense: ${expense.serviceName} - ${expense.amount} on ${expense.timestamp}`);
+    console.log('Parsed expenseDate:', expenseDate);
     
-    // Skip if outside our range
-    if (monthIndex < 0 || monthIndex >= months) return;
+    // Calculate the difference in calendar months from the beginning of the trend period
+    const monthIndex = differenceInCalendarMonths(expenseDate, trendStartDate);
+    console.log('Calculated monthIndex:', monthIndex);
+
+    // Skip if outside our range or invalid index
+    if (monthIndex < 0 || monthIndex >= months) {
+      console.log('Expense skipped (outside range):', expense.timestamp, 'Month Index:', monthIndex);
+      return;
+    }
     
-    // Add to month total
+    // Add to total
     result[monthIndex].total += expense.amount;
     
-    // Add to category within month
+    // Add to category total
     result[monthIndex].byCategory[expense.categoryId] = 
-      (result[monthIndex].byCategory[expense.categoryId] || 0) + 
-      expense.amount;
+      (result[monthIndex].byCategory[expense.categoryId] || 0) + expense.amount;
   });
   
-  // Round numbers for cleaner display
-  result.forEach(month => {
-    month.total = parseFloat(month.total.toFixed(2));
-    Object.keys(month.byCategory).forEach(categoryId => {
-      month.byCategory[categoryId] = parseFloat(
-        month.byCategory[categoryId].toFixed(2)
-      );
-    });
-  });
-  
+  console.log('Final result array (after processing expenses):', JSON.stringify(result, null, 2));
+  console.log('--- End generateTrendData Debugging ---');
   return result;
 };
 
@@ -244,7 +249,7 @@ export const generateCostAllocationData = (
     if (!teamMap.has(expense.teamId)) {
       teamMap.set(expense.teamId, {
         id: expense.teamId,
-        name: expense.teamName,
+        name: expense.teamName || 'Unknown Team',
         value: 0,
         children: []
       });
@@ -261,7 +266,7 @@ export const generateCostAllocationData = (
     if (!projectNode) {
       projectNode = {
         id: expense.projectId,
-        name: expense.projectName,
+        name: expense.projectName || 'Unknown Project',
         value: 0,
         children: []
       };
@@ -278,7 +283,7 @@ export const generateCostAllocationData = (
     if (!categoryNode) {
       categoryNode = {
         id: expense.categoryId,
-        name: expense.categoryName,
+        name: expense.categoryName || 'Unknown Category',
         value: 0,
         children: []
       };
@@ -295,7 +300,7 @@ export const generateCostAllocationData = (
     if (!serviceNode) {
       serviceNode = {
         id: expense.serviceId,
-        name: expense.serviceName,
+        name: expense.serviceName || 'Unknown Service',
         value: 0
       };
       categoryNode.children?.push(serviceNode);

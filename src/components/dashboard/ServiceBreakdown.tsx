@@ -6,6 +6,8 @@ import { useFilters } from '../../context/FilterContext';
 import { useTheme } from '../../context/ThemeContext';
 import { calculateExpensesByCategory, calculateExpensesByService, filterExpenses } from '../../utils/dataTransformers';
 import mockData from '../../utils/mockData';
+import { useAWSCosts } from '../../context/AWSCostContext';
+import { ExpenseByService, Expense, Environment } from '../../types';
 
 // Register ChartJS components
 ChartJS.register(ArcElement, Tooltip, Legend);
@@ -13,6 +15,7 @@ ChartJS.register(ArcElement, Tooltip, Legend);
 const ServiceBreakdown: React.FC = () => {
   const { filters } = useFilters();
   const { theme } = useTheme();
+  const { costSummary: awsCostSummary } = useAWSCosts();
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   
   // Filter expenses based on current filters
@@ -22,23 +25,90 @@ const ServiceBreakdown: React.FC = () => {
   
   // Calculate expenses by category
   const expensesByCategory = useMemo(() => {
-    return calculateExpensesByCategory(filteredExpenses);
-  }, [filteredExpenses]);
+    const allExpenses: Expense[] = [...filteredExpenses];
+
+    // Add AWS expenses to calculate categories if available
+    if (awsCostSummary) {
+      Object.entries(awsCostSummary.costsByService).forEach(([serviceName, data]) => {
+        // Assuming 'aws-category' is defined in mockData or types as 'Cloud Infrastructure'
+        const awsCategory = mockData.categories.find(cat => cat.name === 'Cloud Infrastructure');
+        if (awsCategory) {
+          allExpenses.push({
+            id: `aws-${serviceName}`,
+            timestamp: awsCostSummary.timeRange.end,
+            amount: data.cost,
+            serviceId: serviceName,
+            serviceName: serviceName,
+            categoryId: awsCategory.id,
+            categoryName: awsCategory.name,
+            teamId: 'aws-team',
+            teamName: 'Cloud Providers',
+            projectId: 'aws-project',
+            projectName: 'AWS Infrastructure',
+            environment: 'prod' as Environment,
+            tags: ['aws', 'cloud'],
+            usageMetrics: [],
+          });
+        }
+      });
+    }
+    return calculateExpensesByCategory(allExpenses);
+  }, [filteredExpenses, awsCostSummary]);
   
   // Calculate expenses by service (filtered by selected category if any)
   const expensesByService = useMemo(() => {
-    return calculateExpensesByService(
+    let combinedServices: ExpenseByService[] = [];
+
+    // Add mock data services
+    const mockServices = calculateExpensesByService(
       filteredExpenses,
       selectedCategory || undefined
-    ).slice(0, 5); // Only show top 5
-  }, [filteredExpenses, selectedCategory]);
+    );
+    combinedServices = [...mockServices];
+
+    // Add AWS services if available and filter by selected category
+    if (awsCostSummary) {
+      Object.entries(awsCostSummary.costsByService).forEach(([serviceName, data]) => {
+        const awsCategory = mockData.categories.find(cat => cat.name === 'Cloud Infrastructure');
+        if (awsCategory && (!selectedCategory || selectedCategory === awsCategory.id)) {
+          // Check if service already exists from mock data to aggregate costs
+          const existingServiceIndex = combinedServices.findIndex(s => s.serviceName === serviceName);
+          if (existingServiceIndex !== -1) {
+            combinedServices[existingServiceIndex].amount += data.cost;
+          } else {
+            combinedServices.push({
+              serviceId: serviceName, // Using serviceName as ID for AWS services
+              serviceName: serviceName,
+              amount: data.cost,
+            });
+          }
+        }
+      });
+    }
+
+    // Sort and limit to top 5
+    return combinedServices.sort((a, b) => b.amount - a.amount).slice(0, 5);
+  }, [filteredExpenses, selectedCategory, awsCostSummary]);
   
   // Get category name
   const getCategoryName = useCallback((categoryId: string | null) => {
-    if (!categoryId) return 'All Categories';
+    if (!categoryId) {
+      // If no category is selected, return a combined name or the first category if available
+      if (expensesByCategory.length > 0) {
+        return expensesByCategory.map(cat => cat.categoryName).join(', ');
+      }
+      return 'All Categories'; // Fallback if no categories exist
+    }
     const category = mockData.categories.find(c => c.id === categoryId);
     return category ? category.name : 'Unknown Category';
-  }, []);
+  }, [expensesByCategory]);
+  
+  // Set initial selected category if not already set
+  React.useEffect(() => {
+    if (!selectedCategory && expensesByCategory.length > 0) {
+      setSelectedCategory(expensesByCategory[0].categoryId);
+    }
+  }, [selectedCategory, expensesByCategory]);
   
   // Format currency
   const formatCurrency = (amount: number) => {
@@ -98,7 +168,7 @@ const ServiceBreakdown: React.FC = () => {
       },
       cutout: '65%',
     };
-  }, [theme.isDarkMode]);
+  }, []); // Removed theme.isDarkMode from dependency array as it doesn't affect chart options
   
   // Calculate total amount
   const totalAmount = useMemo(() => {
@@ -147,7 +217,6 @@ const ServiceBreakdown: React.FC = () => {
                 onChange={(e) => setSelectedCategory(e.target.value || null)}
                 className="w-full p-2 border rounded-md text-sm bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white"
               >
-                <option value="">All Categories</option>
                 {expensesByCategory.map(category => (
                   <option key={category.categoryId} value={category.categoryId}>
                     {category.categoryName}
@@ -176,9 +245,9 @@ const ServiceBreakdown: React.FC = () => {
                   }`}
                 >
                   <div className="flex justify-between items-center">
-                    <div className="flex items-center">
+                    <div className="flex items-center flex-grow min-w-0">
                       <span 
-                        className="inline-block w-3 h-3 rounded-full mr-2"
+                        className="inline-block w-3 h-3 rounded-full mr-2 flex-shrink-0"
                         style={{ 
                           backgroundColor: [
                             '#3B82F6', '#10B981', '#8B5CF6', '#F59E0B', '#EC4899'
@@ -189,7 +258,7 @@ const ServiceBreakdown: React.FC = () => {
                         {service.serviceName}
                       </span>
                     </div>
-                    <div className="font-medium dark:text-white">
+                    <div className="font-medium dark:text-white flex-shrink-0">
                       {formatCurrency(service.amount)}
                     </div>
                   </div>
@@ -198,18 +267,8 @@ const ServiceBreakdown: React.FC = () => {
             </div>
           </div>
           
-          <div className="md:w-2/3 h-80 relative">
-            <div className="h-full" id="service-breakdown-chart">
-              <Doughnut data={chartData} options={chartOptions} />
-            </div>
-            
-            {expensesByService.length === 0 && (
-              <div className="absolute inset-0 flex items-center justify-center">
-                <p className="text-gray-500 dark:text-gray-400 text-center">
-                  No data available for the selected filters
-                </p>
-              </div>
-            )}
+          <div className="md:w-2/3 h-80">
+            <Doughnut data={chartData} options={chartOptions} id="service-breakdown-chart" />
           </div>
         </div>
       </div>

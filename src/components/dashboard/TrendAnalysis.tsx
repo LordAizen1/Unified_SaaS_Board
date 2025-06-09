@@ -16,6 +16,9 @@ import { useFilters } from '../../context/FilterContext';
 import { useTheme } from '../../context/ThemeContext';
 import { filterExpenses, generateTrendData } from '../../utils/dataTransformers';
 import mockData from '../../utils/mockData';
+import { useAWSCosts } from '../../context/AWSCostContext';
+import { format, parseISO, isValid } from 'date-fns';
+import { Expense, Environment } from '../../types';
 
 // Register ChartJS components
 ChartJS.register(
@@ -32,16 +35,53 @@ ChartJS.register(
 const TrendAnalysis: React.FC = () => {
   const { filters } = useFilters();
   const { theme } = useTheme();
+  const { costSummary: awsCostSummary } = useAWSCosts();
   
   // Filter expenses based on current filters
   const filteredExpenses = useMemo(() => {
-    return filterExpenses(mockData.expenses, filters);
-  }, [filters]);
+    const mockFiltered = filterExpenses(mockData.expenses, filters);
+    let combined: Expense[] = [...mockFiltered];
+
+    if (awsCostSummary) {
+      // Iterate through daily AWS costs and create Expense objects for each service on each day
+      Object.entries(awsCostSummary.costsByDate).forEach(([date, dailyServiceCosts]) => {
+        const awsCategory = mockData.categories.find(cat => cat.name === 'Cloud Infrastructure');
+        if (awsCategory) {
+          dailyServiceCosts.forEach(item => {
+            combined.push({
+              id: `aws-${item.serviceName}-${date}`,
+              timestamp: date,
+              amount: parseFloat(item.cost.toFixed(2)),
+              serviceId: item.serviceName,
+              serviceName: item.serviceName,
+              categoryId: awsCategory.id,
+              categoryName: awsCategory.name,
+              teamId: 'aws-team',
+              teamName: 'Cloud Providers',
+              projectId: 'aws-project',
+              projectName: 'AWS Metrics',
+              environment: 'prod' as Environment,
+              tags: ['aws', 'cloud'],
+              usageMetrics: [],
+            });
+          });
+        }
+      });
+    }
+    return combined;
+  }, [filters, awsCostSummary]);
   
   // Generate monthly trend data
   const trendData = useMemo(() => {
-    return generateTrendData(filteredExpenses, 6);
-  }, [filteredExpenses]);
+    const startDate = filters.dateRange[0];
+    const endDate = filters.dateRange[1];
+    const numMonths = ((endDate.getFullYear() - startDate.getFullYear()) * 12) + (endDate.getMonth() - startDate.getMonth()) + 1;
+    
+    // Ensure numMonths is positive and reasonable, default to 6 if calculation is off
+    const monthsToGenerate = Math.max(1, Math.min(12, numMonths));
+
+    return generateTrendData(filteredExpenses, monthsToGenerate, endDate);
+  }, [filteredExpenses, filters.dateRange]);
   
   // Format currency
   const formatCurrency = (amount: number) => {

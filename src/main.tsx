@@ -2,9 +2,12 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
 import './index.css';
+import { AWSCostProvider } from './context/AWSCostContext';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <App />
+    <AWSCostProvider>
+      <App />
+    </AWSCostProvider>
   </React.StrictMode>
 );
