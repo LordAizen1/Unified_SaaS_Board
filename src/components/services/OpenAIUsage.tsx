@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { OpenAIService } from '../../utils/openaiService';
 import { OpenAIUsageSummary } from '../../types/openai';
 import { format } from 'date-fns';
+import { useTheme } from '../../context/ThemeContext';
 
 export const OpenAIUsage: React.FC = () => {
   const [apiKey, setApiKey] = useState('');
@@ -10,6 +11,7 @@ export const OpenAIUsage: React.FC = () => {
   const [usageSummary, setUsageSummary] = useState<OpenAIUsageSummary | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { theme } = useTheme();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -29,21 +31,33 @@ export const OpenAIUsage: React.FC = () => {
   };
 
   return (
-    <div className="p-6 bg-white rounded-lg shadow-lg">
-      <h2 className="text-2xl font-bold mb-6">OpenAI Usage</h2>
+    <div className={`p-6 rounded-lg shadow-lg ${
+      theme.isDarkMode ? 'bg-gray-800' : 'bg-white'
+    }`}>
+      <h2 className={`text-2xl font-bold mb-6 ${
+        theme.isDarkMode ? 'text-white' : 'text-gray-900'
+      }`}>OpenAI Usage</h2>
       
       <form onSubmit={handleSubmit} className="mb-6 space-y-4">
         <div>
-          <label className="block text-sm font-medium text-gray-700">OpenAI API Key</label>
+          <label className={`block text-sm font-medium ${
+            theme.isDarkMode ? 'text-gray-300' : 'text-gray-700'
+          }`}>OpenAI API Key</label>
           <input
             type="password"
             value={apiKey}
             onChange={(e) => setApiKey(e.target.value)}
-            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+            className={`mt-1 block w-full rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 ${
+              theme.isDarkMode 
+                ? 'bg-gray-700 border-gray-600 text-white' 
+                : 'border-gray-300'
+            }`}
             placeholder="Enter your OpenAI API Key"
           />
           {apiKey.startsWith('sk-proj-') && (
-            <p className="mt-2 text-sm text-yellow-600">
+            <p className={`mt-2 text-sm ${
+              theme.isDarkMode ? 'text-yellow-400' : 'text-yellow-600'
+            }`}>
               Warning: This appears to be a project API key. Usage data requires an organization API key.
             </p>
           )}
@@ -51,21 +65,33 @@ export const OpenAIUsage: React.FC = () => {
         
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700">Start Date</label>
+            <label className={`block text-sm font-medium ${
+              theme.isDarkMode ? 'text-gray-300' : 'text-gray-700'
+            }`}>Start Date</label>
             <input
               type="date"
               value={startDate}
               onChange={(e) => setStartDate(e.target.value)}
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+              className={`mt-1 block w-full rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 ${
+                theme.isDarkMode 
+                  ? 'bg-gray-700 border-gray-600 text-white' 
+                  : 'border-gray-300'
+              }`}
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700">End Date</label>
+            <label className={`block text-sm font-medium ${
+              theme.isDarkMode ? 'text-gray-300' : 'text-gray-700'
+            }`}>End Date</label>
             <input
               type="date"
               value={endDate}
               onChange={(e) => setEndDate(e.target.value)}
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+              className={`mt-1 block w-full rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 ${
+                theme.isDarkMode 
+                  ? 'bg-gray-700 border-gray-600 text-white' 
+                  : 'border-gray-300'
+              }`}
             />
           </div>
         </div>
@@ -80,7 +106,9 @@ export const OpenAIUsage: React.FC = () => {
       </form>
 
       {error && (
-        <div className="mb-4 p-4 bg-red-50 text-red-700 rounded-md">
+        <div className={`mb-4 p-4 rounded-md ${
+          theme.isDarkMode ? 'bg-red-900/50 text-red-200' : 'bg-red-50 text-red-700'
+        }`}>
           <h3 className="font-medium">Error</h3>
           <p>{error}</p>
           {error.includes('organization API key') && (
@@ -89,7 +117,9 @@ export const OpenAIUsage: React.FC = () => {
                 href="https://platform.openai.com/account/org-settings" 
                 target="_blank" 
                 rel="noopener noreferrer"
-                className="text-indigo-600 hover:text-indigo-500"
+                className={`${
+                  theme.isDarkMode ? 'text-indigo-400 hover:text-indigo-300' : 'text-indigo-600 hover:text-indigo-500'
+                }`}
               >
                 Get your organization API key →
               </a>
@@ -101,14 +131,22 @@ export const OpenAIUsage: React.FC = () => {
       {usageSummary && (
         <div className="space-y-6">
           <div className="grid grid-cols-2 gap-4">
-            <div className="p-4 bg-gray-50 rounded-lg">
-              <h3 className="text-lg font-medium text-gray-900">Total Cost</h3>
+            <div className={`p-4 rounded-lg ${
+              theme.isDarkMode ? 'bg-gray-700' : 'bg-gray-50'
+            }`}>
+              <h3 className={`text-lg font-medium ${
+                theme.isDarkMode ? 'text-white' : 'text-gray-900'
+              }`}>Total Cost</h3>
               <p className="text-2xl font-bold text-indigo-600">
                 ${usageSummary.totalCost.toFixed(2)}
               </p>
             </div>
-            <div className="p-4 bg-gray-50 rounded-lg">
-              <h3 className="text-lg font-medium text-gray-900">Total Tokens</h3>
+            <div className={`p-4 rounded-lg ${
+              theme.isDarkMode ? 'bg-gray-700' : 'bg-gray-50'
+            }`}>
+              <h3 className={`text-lg font-medium ${
+                theme.isDarkMode ? 'text-white' : 'text-gray-900'
+              }`}>Total Tokens</h3>
               <p className="text-2xl font-bold text-indigo-600">
                 {usageSummary.totalTokens.toLocaleString()}
               </p>
@@ -116,20 +154,30 @@ export const OpenAIUsage: React.FC = () => {
           </div>
 
           <div>
-            <h3 className="text-lg font-medium text-gray-900 mb-4">Usage by Model</h3>
+            <h3 className={`text-lg font-medium mb-4 ${
+              theme.isDarkMode ? 'text-white' : 'text-gray-900'
+            }`}>Usage by Model</h3>
             <div className="space-y-4">
-              {Object.entries(usageSummary.costsByModel).map(([model, data]) => (
-                <div key={model} className="p-4 bg-gray-50 rounded-lg">
-                  <h4 className="font-medium text-gray-900">{model}</h4>
+              {Object.entries(usageSummary.usageByModel).map(([model, data]) => (
+                <div key={model} className={`p-4 rounded-lg ${
+                  theme.isDarkMode ? 'bg-gray-700' : 'bg-gray-50'
+                }`}>
+                  <h4 className={`font-medium ${
+                    theme.isDarkMode ? 'text-white' : 'text-gray-900'
+                  }`}>{model}</h4>
                   <div className="mt-2 grid grid-cols-2 gap-4">
                     <div>
-                      <p className="text-sm text-gray-500">Cost</p>
+                      <p className={`text-sm ${
+                        theme.isDarkMode ? 'text-gray-400' : 'text-gray-500'
+                      }`}>Cost</p>
                       <p className="text-lg font-semibold text-indigo-600">
                         ${data.cost.toFixed(2)}
                       </p>
                     </div>
                     <div>
-                      <p className="text-sm text-gray-500">Tokens</p>
+                      <p className={`text-sm ${
+                        theme.isDarkMode ? 'text-gray-400' : 'text-gray-500'
+                      }`}>Tokens</p>
                       <p className="text-lg font-semibold text-indigo-600">
                         {data.tokens.toLocaleString()}
                       </p>
@@ -138,13 +186,6 @@ export const OpenAIUsage: React.FC = () => {
                 </div>
               ))}
             </div>
-          </div>
-
-          <div className="p-4 bg-gray-50 rounded-lg">
-            <h3 className="text-lg font-medium text-gray-900">Time Period</h3>
-            <p className="text-sm text-gray-600">
-              {format(new Date(usageSummary.timeRange.start), 'MMM d, yyyy')} - {format(new Date(usageSummary.timeRange.end), 'MMM d, yyyy')}
-            </p>
           </div>
         </div>
       )}
