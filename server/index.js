@@ -18,25 +18,14 @@ app.get('/api/aws/costs', async (req, res) => {
     const secretAccessKey = req.headers['x-aws-secret-key'];
     const region = req.headers['x-aws-region'];
 
-    console.log('=== AWS Cost Request Details ===');
-    console.log('Query Parameters:', { start_date, end_date });
-    console.log('Headers:', {
-      'x-aws-access-key': accessKeyId ? 'present' : 'missing',
-      'x-aws-secret-key': secretAccessKey ? 'present' : 'missing',
-      'x-aws-region': region || 'not specified'
-    });
-
     if (!accessKeyId || !secretAccessKey) {
-      console.log('Error: Missing AWS credentials');
       return res.status(401).json({ error: 'AWS credentials are required' });
     }
 
     if (!start_date || !end_date) {
-      console.log('Error: Missing date parameters');
       return res.status(400).json({ error: 'Start date and end date are required' });
     }
 
-    console.log('Initializing AWS Cost Explorer client...');
     const costExplorer = new CostExplorer({
       credentials: {
         accessKeyId,
@@ -65,16 +54,12 @@ app.get('/api/aws/costs', async (req, res) => {
         NextPageToken: nextToken,
       };
 
-      console.log('Making request to AWS Cost Explorer with params:', JSON.stringify(params, null, 2));
       const response = await costExplorer.getCostAndUsage(params);
-      console.log('AWS Cost Explorer response received successfully for a page.');
-
       results.push(...response.ResultsByTime);
       nextToken = response.NextPageToken;
 
     } while (nextToken);
     
-    console.log(`AWS Cost Explorer: Fetched ${results.length} daily entries.`);
     res.json({ ResultsByTime: results });
   } catch (error) {
     console.error('=== AWS Cost Explorer Error ===');
@@ -100,9 +85,6 @@ app.get('/api/openai/usage', async (req, res) => {
     const { start_date, end_date } = req.query;
     const apiKey = req.headers['x-api-key'];
 
-    console.log('Received request with params:', { start_date, end_date });
-    console.log('API Key present:', !!apiKey);
-
     if (!apiKey) {
       return res.status(401).json({ error: 'API key is required' });
     }
@@ -115,7 +97,6 @@ app.get('/api/openai/usage', async (req, res) => {
       });
     }
 
-    console.log('Making request to OpenAI API...');
     const response = await axios.get('https://api.openai.com/v1/usage', {
       headers: {
         'Authorization': `Bearer ${apiKey}`,
@@ -126,9 +107,6 @@ app.get('/api/openai/usage', async (req, res) => {
         end_date,
       },
     });
-
-    console.log('OpenAI API response status:', response.status);
-    console.log('Response data:', JSON.stringify(response.data, null, 2));
 
     res.json(response.data);
   } catch (error) {
@@ -166,9 +144,6 @@ app.get('/api/cursor/usage', async (req, res) => {
   try {
     const { start_date, end_date } = req.query;
     const apiKey = req.headers['x-api-key'];
-
-    console.log('Received Cursor AI request with params:', { start_date, end_date });
-    console.log('API Key present:', !!apiKey);
 
     if (!apiKey) {
       return res.status(401).json({ error: 'API key is required' });

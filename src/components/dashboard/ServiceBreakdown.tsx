@@ -5,9 +5,9 @@ import { Download } from 'lucide-react';
 import { useFilters } from '../../context/FilterContext';
 import { useTheme } from '../../context/ThemeContext';
 import { calculateExpensesByCategory, calculateExpensesByService, filterExpenses } from '../../utils/dataTransformers';
-import mockData from '../../utils/mockData';
+import { mockData, categories } from '../../utils/mockData.ts';
 import { useAWSCosts } from '../../context/AWSCostContext';
-import { ExpenseByService, Expense, Environment } from '../../types';
+import { ExpenseByService, Expense, Environment, Category } from '../../types';
 
 // Register ChartJS components
 ChartJS.register(ArcElement, Tooltip, Legend);
@@ -31,7 +31,7 @@ const ServiceBreakdown: React.FC = () => {
     if (awsCostSummary) {
       Object.entries(awsCostSummary.costsByService).forEach(([serviceName, data]) => {
         // Assuming 'aws-category' is defined in mockData or types as 'Cloud Infrastructure'
-        const awsCategory = mockData.categories.find(cat => cat.name === 'Cloud Infrastructure');
+        const awsCategory = categories.find((cat: Category) => cat.name === 'Cloud Infrastructure');
         if (awsCategory) {
           allExpenses.push({
             id: `aws-${serviceName}`,
@@ -69,7 +69,7 @@ const ServiceBreakdown: React.FC = () => {
     // Add AWS services if available and filter by selected category
     if (awsCostSummary) {
       Object.entries(awsCostSummary.costsByService).forEach(([serviceName, data]) => {
-        const awsCategory = mockData.categories.find(cat => cat.name === 'Cloud Infrastructure');
+        const awsCategory = categories.find((cat: Category) => cat.name === 'Cloud Infrastructure');
         if (awsCategory && (!selectedCategory || selectedCategory === awsCategory.id)) {
           // Check if service already exists from mock data to aggregate costs
           const existingServiceIndex = combinedServices.findIndex(s => s.serviceName === serviceName);
@@ -99,7 +99,7 @@ const ServiceBreakdown: React.FC = () => {
       }
       return 'All Categories'; // Fallback if no categories exist
     }
-    const category = mockData.categories.find(c => c.id === categoryId);
+    const category = categories.find((c: Category) => c.id === categoryId);
     return category ? category.name : 'Unknown Category';
   }, [expensesByCategory]);
   

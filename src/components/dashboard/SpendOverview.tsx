@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { ChevronDown, ChevronUp, Download, TrendingDown, TrendingUp } from 'lucide-react';
 import { useFilters } from '../../context/FilterContext';
 import { useTheme } from '../../context/ThemeContext';
@@ -84,11 +84,7 @@ const SpendOverview: React.FC = () => {
     const startDate = filters.dateRange[0];
     const endDate = filters.dateRange[1];
 
-    console.log('SpendOverview: Filter Start Date:', startDate);
-    console.log('SpendOverview: Filter End Date:', endDate);
-
     if (!startDate || !endDate || !isValid(startDate) || !isValid(endDate)) {
-      console.log('SpendOverview: Invalid date range, returning empty data.');
       return { labels: [], data: [] };
     }
 
@@ -96,10 +92,7 @@ const SpendOverview: React.FC = () => {
     for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
       dates.push(new Date(d));
     }
-    console.log('SpendOverview: Generated dates array length:', dates.length);
-    console.log('SpendOverview: First generated date:', dates[0]);
-    console.log('SpendOverview: Last generated date:', dates[dates.length - 1]);
-
+    
     // Initialize all days within the selected range with 0
     dates.forEach(date => {
       const dateString = format(date, 'yyyy-MM-dd');
@@ -119,9 +112,6 @@ const SpendOverview: React.FC = () => {
     if (awsCostSummary && awsCostSummary.timeRange.start && awsCostSummary.timeRange.end) {
       const awsStartDate = parseISO(awsCostSummary.timeRange.start);
       const awsEndDate = parseISO(awsCostSummary.timeRange.end);
-
-      console.log('SpendOverview: AWS Summary Start Date:', awsStartDate);
-      console.log('SpendOverview: AWS Summary End Date:', awsEndDate);
 
       if (isValid(awsStartDate) && isValid(awsEndDate)) {
         // Iterate through dates within the AWS cost summary time range
@@ -146,8 +136,6 @@ const SpendOverview: React.FC = () => {
         }
       }
     }
-    console.log('SpendOverview: Final dailyTotals keys count:', Object.keys(dailyTotals).length);
-    console.log('SpendOverview: Final dailyTotals:', dailyTotals);
 
     // Convert to arrays for chart, ensuring dates are sorted
     const sortedLabels = Object.keys(dailyTotals).sort();

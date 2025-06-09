@@ -15,7 +15,7 @@ import { useTheme } from '../../context/ThemeContext';
 import { calculateUnitEconomics, filterExpenses } from '../../utils/dataTransformers';
 import mockData from '../../utils/mockData';
 import { useAWSCosts } from '../../context/AWSCostContext';
-import { Expense, Environment, UsageMetric } from '../../types';
+import { Expense, Environment } from '../../types';
 import { AWSCostSummary } from '../../types/aws';
 
 // Register ChartJS components
@@ -56,7 +56,6 @@ const UsageMetrics: React.FC = () => {
         dailyServiceCosts.forEach(item => {
           const awsCategory = mockData.categories.find(cat => cat.name === 'Cloud Infrastructure');
           if (awsCategory) {
-            console.log('UsageMetrics: Found awsCategory:', awsCategory);
             allRawExpenses.push({
               id: `aws-${item.serviceName}-${date}`,
               timestamp: date,
@@ -75,14 +74,11 @@ const UsageMetrics: React.FC = () => {
                 { type: `aws-${item.serviceName.toLowerCase().replace(/[^a-z0-9]/g, '-')}-cost`, value: 1 } // Unique metric for each AWS service
               ],
             });
-            console.log('UsageMetrics: Pushed AWS Expense:', { id: `aws-${item.serviceName}-${date}`, amount: parseFloat(item.cost.toFixed(2)), serviceName: item.serviceName, categoryId: awsCategory.id, timestamp: date });
           }
         });
       });
     }
     const filteredCombined = filterExpenses(allRawExpenses, filters);
-    console.log('UsageMetrics: combinedExpenses (after global filter): ', filteredCombined.map(e => ({ id: e.id, serviceName: e.serviceName, amount: e.amount, categoryId: e.categoryId, timestamp: e.timestamp })));
-    console.log('UsageMetrics: Total combinedExpenses amount:', filteredCombined.reduce((sum, e) => sum + e.amount, 0));
     return filteredCombined;
   }, [filters, awsCostSummary]);
 
@@ -115,8 +111,6 @@ const UsageMetrics: React.FC = () => {
       // Filter for OpenAI services by service ID
       filtered = combinedExpenses.filter(expense => expense.serviceId === 'openai');
     }
-    console.log(`UsageMetrics: serviceExpenses for ${selectedService}: `, filtered.map(e => ({ id: e.id, serviceName: e.serviceName, amount: e.amount, categoryId: e.categoryId, timestamp: e.timestamp })));
-    console.log(`UsageMetrics: Total serviceExpenses amount for ${selectedService}:`, filtered.reduce((sum, e) => sum + e.amount, 0));
     return filtered;
   }, [combinedExpenses, selectedService]);
 
@@ -160,7 +154,6 @@ const UsageMetrics: React.FC = () => {
         }
         aggregatedCosts[mainService.name] = totalCostForMainService;
       });
-      console.log('UsageMetrics: unitEconomics for All Services:', aggregatedCosts);
       return aggregatedCosts;
 
     } else {
@@ -170,7 +163,6 @@ const UsageMetrics: React.FC = () => {
         // Group by sub-service name
         subServiceCosts[expense.serviceName] = (subServiceCosts[expense.serviceName] || 0) + expense.amount;
       });
-      console.log(`UsageMetrics: unitEconomics for ${selectedService}:`, subServiceCosts);
       return subServiceCosts;
     }
   }, [combinedExpenses, serviceExpenses, selectedService, mainServices]);

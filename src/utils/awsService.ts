@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { AWSCostData, AWSCostSummary, AWSIndividualCostData } from '../types/aws';
+import { AWSCostSummary, AWSIndividualCostData } from '../types/aws';
 
 const API_URL = '/api/aws/costs';
 

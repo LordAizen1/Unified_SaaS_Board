@@ -175,17 +175,10 @@ export const generateTrendData = (
   months: number = 6,
   endDate: Date = new Date()
 ): MonthlyExpense[] => {
-  console.log('--- generateTrendData Debugging ---');
-  console.log('Input expenses count:', expenses.length);
-  console.log('Requested months:', months);
-  console.log('Provided endDate (from filters):', endDate);
-
   const result: MonthlyExpense[] = [];
   
   // Initialize result array with empty months, starting from the calculated start of the trend period
   const trendStartDate = subMonths(startOfMonth(endDate), months - 1);
-  console.log('Calculated trendStartDate:', trendStartDate);
-
   for (let i = 0; i < months; i++) {
     const monthDate = addMonths(trendStartDate, i);
     const monthString = format(monthDate, 'MMM yyyy');
@@ -196,21 +189,16 @@ export const generateTrendData = (
       byCategory: {}
     });
   }
-  console.log('Initialized result array (empty months):', JSON.stringify(result, null, 2));
   
   // Group expenses by month and category
   expenses.forEach(expense => {
     const expenseDate = parseISO(expense.timestamp);
-    console.log(`Processing expense: ${expense.serviceName} - ${expense.amount} on ${expense.timestamp}`);
-    console.log('Parsed expenseDate:', expenseDate);
     
     // Calculate the difference in calendar months from the beginning of the trend period
     const monthIndex = differenceInCalendarMonths(expenseDate, trendStartDate);
-    console.log('Calculated monthIndex:', monthIndex);
-
+    
     // Skip if outside our range or invalid index
     if (monthIndex < 0 || monthIndex >= months) {
-      console.log('Expense skipped (outside range):', expense.timestamp, 'Month Index:', monthIndex);
       return;
     }
     
@@ -222,8 +210,6 @@ export const generateTrendData = (
       (result[monthIndex].byCategory[expense.categoryId] || 0) + expense.amount;
   });
   
-  console.log('Final result array (after processing expenses):', JSON.stringify(result, null, 2));
-  console.log('--- End generateTrendData Debugging ---');
   return result;
 };
 

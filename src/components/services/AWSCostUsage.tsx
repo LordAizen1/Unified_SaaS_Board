@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { format, subDays, startOfDay, isValid, parseISO, subMonths } from 'date-fns';
 import { useTheme } from '../../context/ThemeContext';
 import { useAWSCosts } from '../../context/AWSCostContext';

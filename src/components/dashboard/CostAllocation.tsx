@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { Download, ZoomIn, ZoomOut } from 'lucide-react';
+import { Download, ZoomIn } from 'lucide-react';
 import { useFilters } from '../../context/FilterContext';
 import { useTheme } from '../../context/ThemeContext';
 import { filterExpenses, generateCostAllocationData } from '../../utils/dataTransformers';
@@ -50,21 +50,18 @@ const CostAllocation: React.FC = () => {
         combined.push(awsExpense);
       });
     }
-    console.log('CostAllocation: combinedExpenses:', combined.map(e => ({ serviceName: e.serviceName, amount: e.amount, categoryId: e.categoryId })));
     return combined;
   }, [filteredMockExpenses, awsCostSummary]);
   
   // Generate treemap data from combined expenses
   const treeData = useMemo(() => {
     const data = generateCostAllocationData(combinedExpenses);
-    console.log('CostAllocation: treeData:', JSON.stringify(data, null, 2));
     return data;
   }, [combinedExpenses]);
   
   // Current view data (root or drilled down)
   const viewData = useMemo(() => {
     const data = currentNode || treeData;
-    console.log('CostAllocation: viewData:', JSON.stringify(data, null, 2));
     return data;
   }, [currentNode, treeData]);
   
