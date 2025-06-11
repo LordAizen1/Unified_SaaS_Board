@@ -188,6 +188,58 @@ app.get('/api/cursor/usage', async (req, res) => {
   }
 });
 
+// Vercel Cost endpoint
+app.get('/api/vercel/costs', async (req, res) => {
+  try {
+    const { start_date, end_date } = req.query;
+    const apiToken = req.headers['x-vercel-token'];
+    const teamId = req.headers['x-vercel-team-id'];
+
+    if (!apiToken) {
+      return res.status(401).json({ error: 'Vercel API token is required' });
+    }
+
+    if (!start_date || !end_date) {
+      return res.status(400).json({ error: 'Start date and end date are required' });
+    }
+
+    const response = await axios.get(`https://api.vercel.com/v2/usage`, {
+      headers: {
+        'Authorization': `Bearer ${apiToken}`,
+        'Content-Type': 'application/json',
+      },
+      params: {
+        teamId,
+        from: start_date,
+        to: end_date,
+      },
+    });
+
+    if (!response.data || !response.data.usage) {
+      return res.status(404).json({ error: 'No usage data found for the selected period' });
+    }
+
+    res.json({
+      usage: response.data.usage,
+      period: {
+        start: start_date,
+        end: end_date,
+      },
+    });
+  } catch (error) {
+    console.error('=== Vercel API Error ===');
+    console.error('Error details:', {
+      message: error.message,
+      status: error.response?.status,
+      data: error.response?.data,
+    });
+
+    res.status(error.response?.status || 500).json({
+      error: error.response?.data?.error || error.message,
+    });
+  }
+});
+
 // Add a health check endpoint
 app.get('/health', (req, res) => {
   res.json({ status: 'ok' });

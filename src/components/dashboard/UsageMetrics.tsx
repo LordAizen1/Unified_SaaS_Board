@@ -15,6 +15,7 @@ import { useTheme } from '../../context/ThemeContext';
 import { calculateUnitEconomics, filterExpenses } from '../../utils/dataTransformers';
 import mockData from '../../utils/mockData';
 import { useAWSCosts } from '../../context/AWSCostContext';
+import { useVercelCosts } from '../../context/VercelCostContext';
 import { Expense, Environment } from '../../types';
 import { AWSCostSummary } from '../../types/aws';
 
@@ -32,6 +33,7 @@ const UsageMetrics: React.FC = () => {
   const { filters } = useFilters();
   const { theme } = useTheme();
   const { costSummary: awsCostSummary } = useAWSCosts();
+  const { costSummary: vercelCostSummary } = useVercelCosts();
   const [selectedService, setSelectedService] = useState<string>('all-services');
 
   // Define the main services for the dropdown
@@ -39,6 +41,7 @@ const UsageMetrics: React.FC = () => {
     return [
       { id: 'all-services', name: 'All Services' }, // Option for aggregated view
       { id: 'aws', name: 'AWS' },
+      { id: 'vercel', name: 'Vercel' },
       { id: 'gcp', name: 'GCP' },
       { id: 'anthropic', name: 'Anthropic' },
       { id: 'datadog', name: 'Datadog' },
@@ -46,12 +49,12 @@ const UsageMetrics: React.FC = () => {
     ];
   }, []);
 
-  // Combine mock and AWS expenses for usage metrics
+  // Combine mock, AWS, and Vercel expenses for usage metrics
   const combinedExpenses = useMemo(() => {
     let allRawExpenses: Expense[] = [...mockData.expenses];
 
+    // Add AWS expenses
     if (awsCostSummary) {
-      // Add AWS expenses from daily service costs for granular sub-service data
       Object.entries(awsCostSummary.costsByDate).forEach(([date, dailyServiceCosts]) => {
         dailyServiceCosts.forEach(item => {
           const awsCategory = mockData.categories.find(cat => cat.name === 'Cloud Infrastructure');
@@ -60,10 +63,10 @@ const UsageMetrics: React.FC = () => {
               id: `aws-${item.serviceName}-${date}`,
               timestamp: date,
               amount: parseFloat(item.cost.toFixed(2)),
-              serviceId: item.serviceName, // AWS Service name (e.g., 'Amazon EC2')
+              serviceId: item.serviceName,
               serviceName: item.serviceName,
-              categoryId: awsCategory.id, // This is 'cat-1'
-              categoryName: awsCategory.name, // This is 'Cloud Infrastructure'
+              categoryId: awsCategory.id,
+              categoryName: awsCategory.name,
               teamId: 'aws-team',
               teamName: 'Cloud Providers',
               projectId: 'aws-project',
@@ -71,44 +74,72 @@ const UsageMetrics: React.FC = () => {
               environment: 'prod' as Environment,
               tags: ['aws', 'cloud', 'usage'],
               usageMetrics: [
-                { type: `aws-${item.serviceName.toLowerCase().replace(/[^a-z0-9]/g, '-')}-cost`, value: 1 } // Unique metric for each AWS service
+                { type: `aws-${item.serviceName.toLowerCase().replace(/[^a-z0-9]/g, '-')}-cost`, value: 1 }
               ],
             });
           }
         });
       });
     }
+
+    // Add Vercel expenses
+    if (vercelCostSummary) {
+      Object.entries(vercelCostSummary.costsByDate).forEach(([date, dailyServiceCosts]) => {
+        dailyServiceCosts.forEach(item => {
+          const vercelCategory = mockData.categories.find(cat => cat.name === 'Cloud Infrastructure');
+          if (vercelCategory) {
+            allRawExpenses.push({
+              id: `vercel-${item.serviceName}-${date}`,
+              timestamp: date,
+              amount: parseFloat(item.cost.toFixed(2)),
+              serviceId: item.serviceName,
+              serviceName: item.serviceName,
+              categoryId: vercelCategory.id,
+              categoryName: vercelCategory.name,
+              teamId: 'vercel-team',
+              teamName: 'Cloud Providers',
+              projectId: 'vercel-project',
+              projectName: 'Vercel Metrics',
+              environment: 'prod' as Environment,
+              tags: ['vercel', 'cloud', 'usage'],
+              usageMetrics: [
+                { type: `vercel-${item.serviceName.toLowerCase().replace(/[^a-z0-9]/g, '-')}-cost`, value: 1 }
+              ],
+            });
+          }
+        });
+      });
+    }
+
     const filteredCombined = filterExpenses(allRawExpenses, filters);
     return filteredCombined;
-  }, [filters, awsCostSummary]);
+  }, [filters, awsCostSummary, vercelCostSummary]);
 
   // Get service options for the dropdown
   const serviceOptions = useMemo(() => {
     return mainServices;
   }, [mainServices]);
 
-  // Filter expenses by selected service (main service or sub-service) for chart display
+  // Filter expenses by selected service
   const serviceExpenses = useMemo(() => {
     let filtered: Expense[] = [];
     if (selectedService === 'all-services') {
-      // For 'All Services', consider all combined expenses
       filtered = combinedExpenses;
     } else if (selectedService === 'aws') {
-      // Filter for AWS services based on category ID (all AWS services fall under 'Cloud Infrastructure')
       filtered = combinedExpenses.filter(expense => 
-        expense.categoryId === 'cat-1'
+        expense.categoryId === 'cat-1' && expense.tags.includes('aws')
+      );
+    } else if (selectedService === 'vercel') {
+      filtered = combinedExpenses.filter(expense => 
+        expense.categoryId === 'cat-1' && expense.tags.includes('vercel')
       );
     } else if (selectedService === 'gcp') {
-      // Filter for GCP services by service ID
       filtered = combinedExpenses.filter(expense => expense.serviceId === 'gcp');
     } else if (selectedService === 'anthropic') {
-      // Filter for Anthropic services by service ID
       filtered = combinedExpenses.filter(expense => expense.serviceId === 'anthropic');
     } else if (selectedService === 'datadog') {
-      // Filter for Datadog services by service ID
       filtered = combinedExpenses.filter(expense => expense.serviceId === 'datadog');
     } else if (selectedService === 'openai') {
-      // Filter for OpenAI services by service ID
       filtered = combinedExpenses.filter(expense => expense.serviceId === 'openai');
     }
     return filtered;

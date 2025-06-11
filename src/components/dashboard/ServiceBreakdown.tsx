@@ -7,6 +7,7 @@ import { useTheme } from '../../context/ThemeContext';
 import { calculateExpensesByCategory, calculateExpensesByService, filterExpenses } from '../../utils/dataTransformers';
 import { mockData, categories } from '../../utils/mockData.ts';
 import { useAWSCosts } from '../../context/AWSCostContext';
+import { useVercelCosts } from '../../context/VercelCostContext';
 import { ExpenseByService, Expense, Environment, Category } from '../../types';
 
 // Register ChartJS components
@@ -16,6 +17,7 @@ const ServiceBreakdown: React.FC = () => {
   const { filters } = useFilters();
   const { theme } = useTheme();
   const { costSummary: awsCostSummary } = useAWSCosts();
+  const { costSummary: vercelCostSummary } = useVercelCosts();
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   
   // Filter expenses based on current filters
@@ -27,10 +29,9 @@ const ServiceBreakdown: React.FC = () => {
   const expensesByCategory = useMemo(() => {
     const allExpenses: Expense[] = [...filteredExpenses];
 
-    // Add AWS expenses to calculate categories if available
+    // Add AWS expenses
     if (awsCostSummary) {
       Object.entries(awsCostSummary.costsByService).forEach(([serviceName, data]) => {
-        // Assuming 'aws-category' is defined in mockData or types as 'Cloud Infrastructure'
         const awsCategory = categories.find((cat: Category) => cat.name === 'Cloud Infrastructure');
         if (awsCategory) {
           allExpenses.push({
@@ -52,8 +53,34 @@ const ServiceBreakdown: React.FC = () => {
         }
       });
     }
+
+    // Add Vercel expenses
+    if (vercelCostSummary) {
+      Object.entries(vercelCostSummary.costsByService).forEach(([serviceName, data]) => {
+        const vercelCategory = categories.find((cat: Category) => cat.name === 'Cloud Infrastructure');
+        if (vercelCategory) {
+          allExpenses.push({
+            id: `vercel-${serviceName}`,
+            timestamp: vercelCostSummary.timeRange.end,
+            amount: data.cost,
+            serviceId: serviceName,
+            serviceName: serviceName,
+            categoryId: vercelCategory.id,
+            categoryName: vercelCategory.name,
+            teamId: 'vercel-team',
+            teamName: 'Cloud Providers',
+            projectId: 'vercel-project',
+            projectName: 'Vercel Infrastructure',
+            environment: 'prod' as Environment,
+            tags: ['vercel', 'cloud'],
+            usageMetrics: [],
+          });
+        }
+      });
+    }
+
     return calculateExpensesByCategory(allExpenses);
-  }, [filteredExpenses, awsCostSummary]);
+  }, [filteredExpenses, awsCostSummary, vercelCostSummary]);
   
   // Calculate expenses by service (filtered by selected category if any)
   const expensesByService = useMemo(() => {
@@ -71,13 +98,31 @@ const ServiceBreakdown: React.FC = () => {
       Object.entries(awsCostSummary.costsByService).forEach(([serviceName, data]) => {
         const awsCategory = categories.find((cat: Category) => cat.name === 'Cloud Infrastructure');
         if (awsCategory && (!selectedCategory || selectedCategory === awsCategory.id)) {
-          // Check if service already exists from mock data to aggregate costs
           const existingServiceIndex = combinedServices.findIndex(s => s.serviceName === serviceName);
           if (existingServiceIndex !== -1) {
             combinedServices[existingServiceIndex].amount += data.cost;
           } else {
             combinedServices.push({
-              serviceId: serviceName, // Using serviceName as ID for AWS services
+              serviceId: serviceName,
+              serviceName: serviceName,
+              amount: data.cost,
+            });
+          }
+        }
+      });
+    }
+
+    // Add Vercel services if available and filter by selected category
+    if (vercelCostSummary) {
+      Object.entries(vercelCostSummary.costsByService).forEach(([serviceName, data]) => {
+        const vercelCategory = categories.find((cat: Category) => cat.name === 'Cloud Infrastructure');
+        if (vercelCategory && (!selectedCategory || selectedCategory === vercelCategory.id)) {
+          const existingServiceIndex = combinedServices.findIndex(s => s.serviceName === serviceName);
+          if (existingServiceIndex !== -1) {
+            combinedServices[existingServiceIndex].amount += data.cost;
+          } else {
+            combinedServices.push({
+              serviceId: serviceName,
               serviceName: serviceName,
               amount: data.cost,
             });
@@ -88,7 +133,7 @@ const ServiceBreakdown: React.FC = () => {
 
     // Sort and limit to top 5
     return combinedServices.sort((a, b) => b.amount - a.amount).slice(0, 5);
-  }, [filteredExpenses, selectedCategory, awsCostSummary]);
+  }, [filteredExpenses, selectedCategory, awsCostSummary, vercelCostSummary]);
   
   // Get category name
   const getCategoryName = useCallback((categoryId: string | null) => {
