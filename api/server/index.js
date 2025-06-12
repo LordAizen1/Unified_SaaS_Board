@@ -1,12 +1,8 @@
 import express from 'express';
 import axios from 'axios';
-import dotenv from 'dotenv';
 import { CostExplorer } from '@aws-sdk/client-cost-explorer';
 
-dotenv.config();
-
 const app = express();
-const port = process.env.PORT || 3001;
 
 app.use(express.json());
 
@@ -16,7 +12,6 @@ app.get('/api/aws/costs', async (req, res) => {
     const { start_date, end_date } = req.query;
     const accessKeyId = req.headers['x-aws-access-key'];
     const secretAccessKey = req.headers['x-aws-secret-key'];
-    const region = req.headers['x-aws-region'];
 
     if (!accessKeyId || !secretAccessKey) {
       return res.status(401).json({ error: 'AWS credentials are required' });
@@ -31,7 +26,7 @@ app.get('/api/aws/costs', async (req, res) => {
         accessKeyId,
         secretAccessKey,
       },
-      region: region || 'us-east-1',
+      region: 'us-east-1', // Default to us-east-1 as region is no longer passed from frontend
     });
 
     const results = [];
@@ -139,55 +134,6 @@ app.get('/api/openai/usage', async (req, res) => {
   }
 });
 
-// Cursor AI usage endpoint
-app.get('/api/cursor/usage', async (req, res) => {
-  try {
-    const { start_date, end_date } = req.query;
-    const apiKey = req.headers['x-api-key'];
-
-    if (!apiKey) {
-      return res.status(401).json({ error: 'API key is required' });
-    }
-
-    // TODO: Replace with actual Cursor AI API endpoint when available
-    // For now, return mock data
-    const mockData = {
-      usage: {
-        total_tokens: 1500000,
-        total_cost: 15.00,
-        currency: 'USD',
-        services: {
-          'code-completion': {
-            tokens: 1000000,
-            cost: 10.00
-          },
-          'code-analysis': {
-            tokens: 500000,
-            cost: 5.00
-          }
-        }
-      },
-      timeRange: {
-        start: start_date,
-        end: end_date
-      }
-    };
-
-    res.json(mockData);
-  } catch (error) {
-    console.error('Detailed Cursor AI error:', {
-      message: error.message,
-      response: error.response?.data,
-      status: error.response?.status,
-    });
-
-    res.status(error.response?.status || 500).json({
-      error: error.response?.data?.error || 'Internal server error',
-      details: error.message,
-    });
-  }
-});
-
 // Vercel Cost endpoint
 app.get('/api/vercel/costs', async (req, res) => {
   try {
@@ -245,7 +191,4 @@ app.get('/health', (req, res) => {
   res.json({ status: 'ok' });
 });
 
-app.listen(port, () => {
-  console.log(`Server running on port ${port}`);
-  console.log(`Health check available at http://localhost:${port}/health`);
-}); 
+export default app; 
