@@ -6,12 +6,10 @@ const API_URL = '/api/aws/costs';
 export class AWSService {
   private accessKeyId: string;
   private secretAccessKey: string;
-  private region: string;
 
-  constructor(accessKeyId: string, secretAccessKey: string, region: string) {
+  constructor(accessKeyId: string, secretAccessKey: string) {
     this.accessKeyId = accessKeyId;
     this.secretAccessKey = secretAccessKey;
-    this.region = region;
   }
 
   async getCostData(startDate: string, endDate: string): Promise<AWSIndividualCostData[]> {
@@ -20,7 +18,6 @@ export class AWSService {
         headers: {
           'x-aws-access-key': this.accessKeyId,
           'x-aws-secret-key': this.secretAccessKey,
-          'x-aws-region': this.region,
           'Content-Type': 'application/json',
         },
         params: {

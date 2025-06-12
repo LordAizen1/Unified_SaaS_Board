@@ -6,7 +6,7 @@ interface AWSCostContextType {
   costSummary: AWSCostSummary | null;
   isLoading: boolean;
   error: string | null;
-  fetchAWSCosts: (accessKeyId: string, secretAccessKey: string, region: string, startDate: string, endDate: string) => Promise<void>;
+  fetchAWSCosts: (accessKeyId: string, secretAccessKey: string, startDate: string, endDate: string) => Promise<void>;
 }
 
 const AWSCostContext = createContext<AWSCostContextType | undefined>(undefined);
@@ -16,21 +16,19 @@ export const AWSCostProvider: React.FC<{ children: ReactNode }> = ({ children })
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchAWSCosts = useCallback(async (accessKeyId: string, secretAccessKey: string, region: string, startDate: string, endDate: string) => {
+  const fetchAWSCosts = useCallback(async (accessKeyId: string, secretAccessKey: string, startDate: string, endDate: string) => {
     setIsLoading(true);
     setError(null);
     setCostSummary(null); // Clear previous data
 
     try {
-      const service = new AWSService(accessKeyId, secretAccessKey, region);
+      const service = new AWSService(accessKeyId, secretAccessKey);
       const data = await service.getCostData(startDate, endDate);
-      console.log('AWSCostContext: Raw data from getCostData:', data);
       const summary = service.calculateCostSummary(data);
-      console.log('AWSCostContext: Calculated summary:', summary);
       setCostSummary(summary);
     } catch (err) {
       console.error('Error in AWSCostProvider fetching AWS cost data:', err);
-      setError(err instanceof Error ? err.message : 'An unknown error occurred while fetching AWS cost data.');
+      setError(err instanceof Error ? err.message : 'Failed to fetch AWS cost data');
     } finally {
       setIsLoading(false);
     }

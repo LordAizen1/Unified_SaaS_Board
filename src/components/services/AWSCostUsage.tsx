@@ -3,11 +3,11 @@ import { format, subDays, startOfDay, isValid, parseISO, subMonths } from 'date-
 import { useTheme } from '../../context/ThemeContext';
 import { useAWSCosts } from '../../context/AWSCostContext';
 import { useFilters } from '../../context/FilterContext';
+import awsLogo from '../../assets/logos/aws.png';
 
 export const AWSCostUsage: React.FC = () => {
   const [apiKey, setApiKey] = useState('');
   const [secretKey, setSecretKey] = useState('');
-  const [region, setRegion] = useState('us-east-1');
 
   const maxPastDate = subMonths(startOfDay(new Date()), 14); // 14 months ago
 
@@ -56,9 +56,9 @@ export const AWSCostUsage: React.FC = () => {
   // Fetch AWS costs automatically when keys or local dates change
   useEffect(() => {
     if (apiKey && secretKey && !dateError) {
-      fetchAWSCosts(apiKey, secretKey, region, startDate, endDate);
+      fetchAWSCosts(apiKey, secretKey, startDate, endDate);
     }
-  }, [apiKey, secretKey, region, startDate, endDate, dateError, fetchAWSCosts]);
+  }, [apiKey, secretKey, startDate, endDate, dateError, fetchAWSCosts]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -68,16 +68,17 @@ export const AWSCostUsage: React.FC = () => {
     }
 
     // This will trigger the useEffect above
-    fetchAWSCosts(apiKey, secretKey, region, startDate, endDate);
+    fetchAWSCosts(apiKey, secretKey, startDate, endDate);
   };
 
   return (
     <div className={`p-6 rounded-lg shadow-lg ${
       theme.isDarkMode ? 'bg-gray-800' : 'bg-white'
     }`}>
-      <h2 className={`text-2xl font-bold mb-6 ${
-        theme.isDarkMode ? 'text-white' : 'text-gray-900'
-      }`}>AWS Cost Usage</h2>
+      <h2 className={`flex items-center text-2xl font-bold mb-6 text-gray-900 dark:text-white`}>
+        <img src={awsLogo} alt="AWS Logo" className="w-6 h-6 mr-2" />
+        AWS Cost Usage
+      </h2>
       
       <form onSubmit={handleSubmit} className="mb-6 space-y-4">
         <div>
@@ -112,26 +113,6 @@ export const AWSCostUsage: React.FC = () => {
             }`}
             placeholder="Enter your AWS Secret Access Key"
           />
-        </div>
-
-        <div>
-          <label className={`block text-sm font-medium ${
-            theme.isDarkMode ? 'text-gray-300' : 'text-gray-700'
-          }`}>AWS Region</label>
-          <select
-            value={region}
-            onChange={(e) => setRegion(e.target.value)}
-            className={`mt-1 block w-full rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 ${
-              theme.isDarkMode 
-                ? 'bg-gray-700 border-gray-600 text-white' 
-                : 'border-gray-300'
-            }`}
-          >
-            <option value="us-east-1">US East (N. Virginia)</option>
-            <option value="us-west-2">US West (Oregon)</option>
-            <option value="eu-west-1">EU (Ireland)</option>
-            <option value="ap-southeast-1">Asia Pacific (Singapore)</option>
-          </select>
         </div>
         
         <div className="grid grid-cols-2 gap-4">

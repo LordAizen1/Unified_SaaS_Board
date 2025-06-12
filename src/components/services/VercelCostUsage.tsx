@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { format, subDays, startOfDay, isValid, parseISO, subMonths } from 'date-fns';
 import { useTheme } from '../../context/ThemeContext';
 import { useVercelCosts } from '../../context/VercelCostContext';
+import vercelLogo from '../../assets/logos/vercel.png';
 
 export const VercelCostUsage: React.FC = () => {
   const [apiToken, setApiToken] = useState('');
@@ -73,9 +74,10 @@ export const VercelCostUsage: React.FC = () => {
     <div className={`p-6 rounded-lg shadow-lg ${
       theme.isDarkMode ? 'bg-gray-800' : 'bg-white'
     }`}>
-      <h2 className={`text-2xl font-bold mb-6 ${
-        theme.isDarkMode ? 'text-white' : 'text-gray-900'
-      }`}>Vercel Cost Usage</h2>
+      <h2 className={`flex items-center text-2xl font-bold mb-6 text-gray-900 dark:text-white`}>
+        <img src={vercelLogo} alt="Vercel Logo" className="w-6 h-6 mr-2" />
+        Vercel Cost Usage
+      </h2>
       
       <form onSubmit={handleSubmit} className="mb-6 space-y-4">
         <div>

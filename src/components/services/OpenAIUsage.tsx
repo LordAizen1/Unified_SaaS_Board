@@ -3,6 +3,7 @@ import { OpenAIService } from '../../utils/openaiService';
 import { OpenAIUsageSummary } from '../../types/openai';
 import { format } from 'date-fns';
 import { useTheme } from '../../context/ThemeContext';
+import openaiLogo from '../../assets/logos/openai.png';
 
 export const OpenAIUsage: React.FC = () => {
   const [apiKey, setApiKey] = useState('');
@@ -34,9 +35,10 @@ export const OpenAIUsage: React.FC = () => {
     <div className={`p-6 rounded-lg shadow-lg ${
       theme.isDarkMode ? 'bg-gray-800' : 'bg-white'
     }`}>
-      <h2 className={`text-2xl font-bold mb-6 ${
-        theme.isDarkMode ? 'text-white' : 'text-gray-900'
-      }`}>OpenAI Usage</h2>
+      <h2 className={`flex items-center text-2xl font-bold mb-6 text-gray-900 dark:text-white`}>
+        <img src={openaiLogo} alt="OpenAI Logo" className="w-6 h-6 mr-2" />
+        OpenAI Usage
+      </h2>
       
       <form onSubmit={handleSubmit} className="mb-6 space-y-4">
         <div>
