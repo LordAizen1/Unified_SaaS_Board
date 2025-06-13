@@ -9,7 +9,7 @@ import {
   Title,
   Tooltip
 } from 'chart.js';
-import { Download } from 'lucide-react';
+import { Download, Filter, BarChart3, Zap, DollarSign } from 'lucide-react';
 import { useFilters } from '../../context/FilterContext';
 import { useTheme } from '../../context/ThemeContext';
 import { calculateUnitEconomics, filterExpenses } from '../../utils/dataTransformers';
@@ -17,7 +17,6 @@ import mockData from '../../utils/mockData';
 import { useAWSCosts } from '../../context/AWSCostContext';
 import { useVercelCosts } from '../../context/VercelCostContext';
 import { Expense, Environment } from '../../types';
-import { AWSCostSummary } from '../../types/aws';
 
 // Register ChartJS components
 ChartJS.register(
@@ -39,7 +38,7 @@ const UsageMetrics: React.FC = () => {
   // Define the main services for the dropdown
   const mainServices = useMemo(() => {
     return [
-      { id: 'all-services', name: 'All Services' }, // Option for aggregated view
+      { id: 'all-services', name: 'All Services' },
       { id: 'aws', name: 'AWS' },
       { id: 'vercel', name: 'Vercel' },
       { id: 'gcp', name: 'GCP' },
@@ -189,7 +188,7 @@ const UsageMetrics: React.FC = () => {
 
     } else {
       // When a specific main service is selected, calculate unit economics for its sub-services.
-      const subServiceCosts: Record<string, number> = {}; // Changed to number for simplicity
+      const subServiceCosts: Record<string, number> = {};
       serviceExpenses.forEach(expense => {
         // Group by sub-service name
         subServiceCosts[expense.serviceName] = (subServiceCosts[expense.serviceName] || 0) + expense.amount;
@@ -206,11 +205,6 @@ const UsageMetrics: React.FC = () => {
       minimumFractionDigits: amount < 0.01 && amount !== 0 ? 6 : 0,
       maximumFractionDigits: amount < 0.01 && amount !== 0 ? 6 : 0,
     }).format(amount);
-  };
-  
-  // Format number with commas
-  const formatNumber = (num: number) => {
-    return new Intl.NumberFormat('en-US').format(num);
   };
   
   // Export chart as PNG
@@ -237,10 +231,29 @@ const UsageMetrics: React.FC = () => {
     return formatCurrency(total);
   }, [unitEconomics, formatCurrency]);
 
-  // Prepare chart data
+  // Enhanced color palette for bars
+  const generateBarColors = (count: number) => {
+    const baseColors = [
+      '#3B82F6', '#10B981', '#8B5CF6', '#F59E0B', '#EF4444',
+      '#06B6D4', '#84CC16', '#F97316', '#EC4899', '#6366F1'
+    ];
+    
+    return Array.from({ length: count }, (_, i) => {
+      const baseColor = baseColors[i % baseColors.length];
+      return {
+        backgroundColor: baseColor + '80', // 50% opacity
+        borderColor: baseColor,
+        hoverBackgroundColor: baseColor + 'CC', // 80% opacity
+        hoverBorderColor: baseColor,
+      };
+    });
+  };
+
+  // Prepare chart data with enhanced styling
   const chartData = useMemo(() => {
     const labels = Object.keys(unitEconomics);
     const data = Object.values(unitEconomics);
+    const colors = generateBarColors(labels.length);
     
     const datasetLabel = selectedService === 'all-services'
       ? 'Cost per Main Service'
@@ -252,29 +265,35 @@ const UsageMetrics: React.FC = () => {
         {
           label: datasetLabel,
           data: data,
-          backgroundColor: theme.isDarkMode ? '#3B82F680' : '#3B82F6',
-          borderColor: '#2563EB',
-          borderWidth: 1,
+          backgroundColor: colors.map(c => c.backgroundColor),
+          borderColor: colors.map(c => c.borderColor),
+          hoverBackgroundColor: colors.map(c => c.hoverBackgroundColor),
+          hoverBorderColor: colors.map(c => c.hoverBorderColor),
+          borderWidth: 2,
+          borderRadius: 6,
+          borderSkipped: false,
         },
       ],
     };
-  }, [unitEconomics, selectedService, getDisplayTitle, theme.isDarkMode]);
+  }, [unitEconomics, selectedService, getDisplayTitle]);
   
-  // Chart options
+  // Chart options with enhanced styling
   const chartOptions = useMemo(() => {
     return {
       responsive: true,
       maintainAspectRatio: false,
       plugins: {
         legend: {
-          position: 'top' as const,
-          labels: {
-            boxWidth: 12,
-            padding: 15,
-            color: theme.isDarkMode ? '#D1D5DB' : '#4B5563',
-          },
+          display: false,
         },
         tooltip: {
+          backgroundColor: theme.isDarkMode ? '#1f2937' : '#ffffff',
+          titleColor: theme.isDarkMode ? '#f9fafb' : '#111827',
+          bodyColor: theme.isDarkMode ? '#d1d5db' : '#374151',
+          borderColor: theme.isDarkMode ? '#374151' : '#e5e7eb',
+          borderWidth: 1,
+          cornerRadius: 8,
+          displayColors: true,
           callbacks: {
             label: (context: any) => {
               const value = context.raw;
@@ -292,6 +311,11 @@ const UsageMetrics: React.FC = () => {
           },
           ticks: {
             color: theme.isDarkMode ? '#9CA3AF' : '#6B7280',
+            font: {
+              size: 11,
+              weight: '500',
+            },
+            maxRotation: 45,
           },
         },
         y: {
@@ -301,70 +325,191 @@ const UsageMetrics: React.FC = () => {
           },
           ticks: {
             color: theme.isDarkMode ? '#9CA3AF' : '#6B7280',
+            font: {
+              size: 11,
+              weight: '500',
+            },
             callback: function(value: number | string) {
               return formatCurrency(Number(value));
             },
           },
         },
       },
+      animation: {
+        duration: 1000,
+        easing: 'easeInOutQuart' as const,
+      },
+      elements: {
+        bar: {
+          borderWidth: 2,
+        },
+      },
     };
   }, [theme.isDarkMode, formatCurrency]);
+
+  // Calculate additional metrics
+  const additionalMetrics = useMemo(() => {
+    const values = Object.values(unitEconomics);
+    if (values.length === 0) return null;
+    
+    const total = values.reduce((sum, val) => sum + val, 0);
+    const average = total / values.length;
+    const highest = Math.max(...values);
+    const lowest = Math.min(...values);
+    
+    return { total, average, highest, lowest };
+  }, [unitEconomics]);
   
   return (
-    <div className={`rounded-lg overflow-hidden shadow-sm ${
+    <div className={`rounded-xl overflow-hidden shadow-lg border ${
       theme.isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
-    } border transition-colors duration-200`}>
-      <div className="p-4 sm:p-6">
-        <div className="flex justify-between items-start mb-6">
+    } transition-all duration-200 hover:shadow-xl`}>
+      <div className="p-6 sm:p-8">
+        <div className="flex justify-between items-start mb-8">
           <div>
-            <h2 className={`text-lg font-semibold ${
+            <h2 className={`text-xl font-bold ${
               theme.isDarkMode ? 'text-white' : 'text-gray-900'
-            }`}>
+            } mb-2`}>
               Usage Metrics
             </h2>
             <p className={`text-sm ${
               theme.isDarkMode ? 'text-gray-400' : 'text-gray-500'
             }`}>
-              Cost per unit analysis
+              Cost analysis by service
             </p>
           </div>
           
-          <div className="flex items-center space-x-2">
-            <select
-              value={selectedService}
-              onChange={(e) => setSelectedService(e.target.value)}
-              className={`block w-full rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 ${theme.isDarkMode ? 'bg-gray-700 border-gray-600 text-white' : 'border-gray-300'}`}
-            >
-              {serviceOptions.map(option => (
-                <option key={option.id} value={option.id}>
-                  {option.name}
-                </option>
-              ))}
-            </select>
+          <div className="flex items-center gap-3">
+            <div className={`flex items-center gap-2 px-3 py-2 rounded-lg border ${
+              theme.isDarkMode ? 'bg-gray-700/30 border-gray-600' : 'bg-gray-50 border-gray-200'
+            }`}>
+              <Filter className={`w-4 h-4 ${
+                theme.isDarkMode ? 'text-gray-400' : 'text-gray-500'
+              }`} />
+              <select
+                value={selectedService}
+                onChange={(e) => setSelectedService(e.target.value)}
+                className={`bg-transparent border-none text-sm font-medium focus:outline-none ${
+                  theme.isDarkMode ? 'text-white' : 'text-gray-900'
+                }`}
+              >
+                {serviceOptions.map(option => (
+                  <option key={option.id} value={option.id}>
+                    {option.name}
+                  </option>
+                ))}
+              </select>
+            </div>
 
             <button
               onClick={exportChart}
-              className={`p-2 rounded-md ${theme.isDarkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-100'} transition-colors duration-150`}
+              className={`p-3 rounded-lg ${
+                theme.isDarkMode ? 'hover:bg-gray-700 text-gray-400 hover:text-gray-300' : 'hover:bg-gray-100 text-gray-500 hover:text-gray-600'
+              } transition-all duration-150`}
               aria-label="Export chart"
             >
-              <Download size={16} />
+              <Download size={18} />
             </button>
           </div>
         </div>
         
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
-          <div className={`p-4 rounded-md shadow ${theme.isDarkMode ? 'bg-gray-700' : 'bg-gray-50'}`}>
-            <p className={`text-sm font-medium ${theme.isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>Total {getDisplayTitle} Cost</p>
-            <p className={`text-xl font-bold ${theme.isDarkMode ? 'text-white' : 'text-gray-900'}`}>{getDisplayValue}</p>
-          </div>
-        </div>
+        {/* Metrics Summary */}
+        {additionalMetrics && (
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+            <div className={`p-4 rounded-lg border ${
+              theme.isDarkMode ? 'bg-blue-500/10 border-blue-500/20' : 'bg-blue-50 border-blue-200'
+            }`}>
+              <div className="flex items-center gap-2 mb-2">
+                <DollarSign className={`w-4 h-4 ${
+                  theme.isDarkMode ? 'text-blue-400' : 'text-blue-600'
+                }`} />
+                <span className={`text-sm font-medium ${
+                  theme.isDarkMode ? 'text-blue-300' : 'text-blue-700'
+                }`}>
+                  Total Cost
+                </span>
+              </div>
+              <div className={`text-lg font-bold ${
+                theme.isDarkMode ? 'text-white' : 'text-gray-900'
+              }`}>
+                {formatCurrency(additionalMetrics.total)}
+              </div>
+            </div>
 
-        <div className="h-80">
+            <div className={`p-4 rounded-lg border ${
+              theme.isDarkMode ? 'bg-gray-700/30 border-gray-600' : 'bg-gray-50 border-gray-200'
+            }`}>
+              <div className="flex items-center gap-2 mb-2">
+                <BarChart3 className={`w-4 h-4 ${
+                  theme.isDarkMode ? 'text-gray-400' : 'text-gray-600'
+                }`} />
+                <span className={`text-sm font-medium ${
+                  theme.isDarkMode ? 'text-gray-300' : 'text-gray-700'
+                }`}>
+                  Average
+                </span>
+              </div>
+              <div className={`text-lg font-bold ${
+                theme.isDarkMode ? 'text-white' : 'text-gray-900'
+              }`}>
+                {formatCurrency(additionalMetrics.average)}
+              </div>
+            </div>
+
+            <div className={`p-4 rounded-lg border ${
+              theme.isDarkMode ? 'bg-green-500/10 border-green-500/20' : 'bg-green-50 border-green-200'
+            }`}>
+              <div className="flex items-center gap-2 mb-2">
+                <Zap className={`w-4 h-4 ${
+                  theme.isDarkMode ? 'text-green-400' : 'text-green-600'
+                }`} />
+                <span className={`text-sm font-medium ${
+                  theme.isDarkMode ? 'text-green-300' : 'text-green-700'
+                }`}>
+                  Highest
+                </span>
+              </div>
+              <div className={`text-lg font-bold ${
+                theme.isDarkMode ? 'text-white' : 'text-gray-900'
+              }`}>
+                {formatCurrency(additionalMetrics.highest)}
+              </div>
+            </div>
+
+            <div className={`p-4 rounded-lg border ${
+              theme.isDarkMode ? 'bg-gray-700/30 border-gray-600' : 'bg-gray-50 border-gray-200'
+            }`}>
+              <div className="flex items-center gap-2 mb-2">
+                <BarChart3 className={`w-4 h-4 ${
+                  theme.isDarkMode ? 'text-gray-400' : 'text-gray-600'
+                }`} />
+                <span className={`text-sm font-medium ${
+                  theme.isDarkMode ? 'text-gray-300' : 'text-gray-700'
+                }`}>
+                  Lowest
+                </span>
+              </div>
+              <div className={`text-lg font-bold ${
+                theme.isDarkMode ? 'text-white' : 'text-gray-900'
+              }`}>
+                {formatCurrency(additionalMetrics.lowest)}
+              </div>
+            </div>
+          </div>
+        )}
+
+        <div className="h-96" id="usage-metrics-chart">
           {Object.keys(unitEconomics).length > 0 ? (
             <Bar data={chartData} options={chartOptions} />
           ) : (
-            <div className={`flex items-center justify-center h-full ${theme.isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-              No usage metrics available for the selected service/period.
+            <div className={`flex items-center justify-center h-full ${
+              theme.isDarkMode ? 'text-gray-400' : 'text-gray-500'
+            }`}>
+              <div className="text-center">
+                <BarChart3 className="w-16 h-16 mx-auto mb-4 opacity-50" />
+                <h3 className="text-lg font-medium mb-2">No Data Available</h3>
+                <p className="text-sm">No usage metrics available for the selected service/period.</p>
+              </div>
             </div>
           )}
         </div>

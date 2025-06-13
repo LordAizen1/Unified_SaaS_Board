@@ -1,7 +1,7 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import { Doughnut } from 'react-chartjs-2';
 import { ArcElement, Chart as ChartJS, Legend, Tooltip } from 'chart.js';
-import { Download } from 'lucide-react';
+import { Download, Filter, TrendingUp, BarChart3 } from 'lucide-react';
 import { useFilters } from '../../context/FilterContext';
 import { useTheme } from '../../context/ThemeContext';
 import { calculateExpensesByCategory, calculateExpensesByService, filterExpenses } from '../../utils/dataTransformers';
@@ -138,11 +138,10 @@ const ServiceBreakdown: React.FC = () => {
   // Get category name
   const getCategoryName = useCallback((categoryId: string | null) => {
     if (!categoryId) {
-      // If no category is selected, return a combined name or the first category if available
       if (expensesByCategory.length > 0) {
         return expensesByCategory.map(cat => cat.categoryName).join(', ');
       }
-      return 'All Categories'; // Fallback if no categories exist
+      return 'All Categories';
     }
     const category = categories.find((c: Category) => c.id === categoryId);
     return category ? category.name : 'Unknown Category';
@@ -176,44 +175,70 @@ const ServiceBreakdown: React.FC = () => {
     }
   };
   
-  // Prepare chart data
+  // Enhanced color palette
+  const colorPalette = [
+    '#3B82F6', // blue
+    '#10B981', // emerald
+    '#8B5CF6', // violet
+    '#F59E0B', // amber
+    '#EF4444', // red
+    '#06B6D4', // cyan
+    '#84CC16', // lime
+    '#F97316', // orange
+  ];
+  
+  // Prepare chart data with enhanced styling
   const chartData = useMemo(() => {
     return {
       labels: expensesByService.map(service => service.serviceName),
       datasets: [
         {
           data: expensesByService.map(service => service.amount),
-          backgroundColor: [
-            '#3B82F6', // blue
-            '#10B981', // green
-            '#8B5CF6', // purple
-            '#F59E0B', // amber
-            '#EC4899', // pink
-          ],
+          backgroundColor: colorPalette.slice(0, expensesByService.length),
           borderWidth: 0,
+          hoverBorderWidth: 3,
+          hoverBorderColor: theme.isDarkMode ? '#ffffff' : '#000000',
+          hoverOffset: 8,
         },
       ],
     };
-  }, [expensesByService]);
+  }, [expensesByService, theme.isDarkMode]);
   
-  // Chart options
+  // Chart options with enhanced styling
   const chartOptions = useMemo(() => {
     return {
       responsive: true,
       maintainAspectRatio: false,
       plugins: {
+        legend: {
+          display: false,
+        },
         tooltip: {
+          backgroundColor: theme.isDarkMode ? '#1f2937' : '#ffffff',
+          titleColor: theme.isDarkMode ? '#f9fafb' : '#111827',
+          bodyColor: theme.isDarkMode ? '#d1d5db' : '#374151',
+          borderColor: theme.isDarkMode ? '#374151' : '#e5e7eb',
+          borderWidth: 1,
+          cornerRadius: 8,
+          displayColors: true,
           callbacks: {
             label: (context: any) => {
               const value = context.raw;
-              return ` ${formatCurrency(value)}`;
+              const total = context.dataset.data.reduce((a: number, b: number) => a + b, 0);
+              const percentage = ((value / total) * 100).toFixed(1);
+              return ` ${formatCurrency(value)} (${percentage}%)`;
             },
           },
         },
       },
       cutout: '65%',
+      animation: {
+        animateRotate: true,
+        animateScale: true,
+        duration: 1000,
+      },
     };
-  }, []); // Removed theme.isDarkMode from dependency array as it doesn't affect chart options
+  }, [theme.isDarkMode]);
   
   // Calculate total amount
   const totalAmount = useMemo(() => {
@@ -221,15 +246,15 @@ const ServiceBreakdown: React.FC = () => {
   }, [expensesByService]);
   
   return (
-    <div className={`rounded-lg overflow-hidden shadow-sm ${
+    <div className={`rounded-xl overflow-hidden shadow-lg border ${
       theme.isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
-    } border transition-colors duration-200`}>
-      <div className="p-4 sm:p-6">
-        <div className="flex justify-between items-start mb-6">
+    } transition-all duration-200 hover:shadow-xl`}>
+      <div className="p-6 sm:p-8">
+        <div className="flex justify-between items-start mb-8">
           <div>
-            <h2 className={`text-lg font-semibold ${
+            <h2 className={`text-xl font-bold ${
               theme.isDarkMode ? 'text-white' : 'text-gray-900'
-            }`}>
+            } mb-2`}>
               Service Breakdown
             </h2>
             <p className={`text-sm ${
@@ -241,26 +266,41 @@ const ServiceBreakdown: React.FC = () => {
           
           <button
             onClick={exportChart}
-            className={`p-2 rounded-md ${
-              theme.isDarkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-100'
-            } transition-colors duration-150`}
+            className={`p-3 rounded-lg ${
+              theme.isDarkMode ? 'hover:bg-gray-700 text-gray-400 hover:text-gray-300' : 'hover:bg-gray-100 text-gray-500 hover:text-gray-600'
+            } transition-all duration-150`}
             aria-label="Export chart"
           >
-            <Download size={16} />
+            <Download size={18} />
           </button>
         </div>
         
-        <div className="flex flex-col md:flex-row gap-6">
-          <div className="md:w-1/3">
-            <div className="mb-4">
-              <label htmlFor="category-filter" className="block text-sm font-medium mb-1 dark:text-gray-300">
-                Filter by Category
-              </label>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          {/* Left side - Controls and Legend */}
+          <div className="space-y-6">
+            {/* Category Filter */}
+            <div className={`p-4 rounded-lg border ${
+              theme.isDarkMode ? 'bg-gray-700/30 border-gray-600' : 'bg-gray-50 border-gray-200'
+            }`}>
+              <div className="flex items-center gap-2 mb-3">
+                <Filter className={`w-4 h-4 ${
+                  theme.isDarkMode ? 'text-gray-400' : 'text-gray-500'
+                }`} />
+                <label htmlFor="category-filter" className={`text-sm font-medium ${
+                  theme.isDarkMode ? 'text-gray-300' : 'text-gray-700'
+                }`}>
+                  Filter by Category
+                </label>
+              </div>
               <select
                 id="category-filter"
                 value={selectedCategory || ''}
                 onChange={(e) => setSelectedCategory(e.target.value || null)}
-                className="w-full p-2 border rounded-md text-sm bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                className={`w-full p-3 border rounded-lg text-sm transition-colors ${
+                  theme.isDarkMode 
+                    ? 'bg-gray-700 border-gray-600 text-white focus:border-blue-500' 
+                    : 'bg-white border-gray-300 focus:border-blue-500'
+                } focus:ring-2 focus:ring-blue-500/20`}
               >
                 {expensesByCategory.map(category => (
                   <option key={category.categoryId} value={category.categoryId}>
@@ -270,50 +310,120 @@ const ServiceBreakdown: React.FC = () => {
               </select>
             </div>
             
-            <div className="space-y-3">
-              <div className={`p-3 rounded-md ${
-                theme.isDarkMode ? 'bg-gray-700' : 'bg-gray-50'
-              }`}>
-                <div className="text-sm mb-1 dark:text-gray-300">
-                  {getCategoryName(selectedCategory)}
+            {/* Total Summary */}
+            <div className={`p-4 rounded-lg border ${
+              theme.isDarkMode ? 'bg-blue-500/10 border-blue-500/20' : 'bg-blue-50 border-blue-200'
+            }`}>
+              <div className="flex items-center gap-3 mb-2">
+                <div className={`p-2 rounded-lg ${
+                  theme.isDarkMode ? 'bg-blue-500/20' : 'bg-blue-100'
+                }`}>
+                  <BarChart3 className={`w-5 h-5 ${
+                    theme.isDarkMode ? 'text-blue-400' : 'text-blue-600'
+                  }`} />
                 </div>
-                <div className="font-medium text-lg dark:text-white">
-                  {formatCurrency(totalAmount)}
-                </div>
-              </div>
-              
-              {expensesByService.map((service, index) => (
-                <div 
-                  key={service.serviceId}
-                  className={`p-3 rounded-md ${
-                    theme.isDarkMode ? 'bg-gray-700' : 'bg-gray-50'
-                  }`}
-                >
-                  <div className="flex justify-between items-center">
-                    <div className="flex items-center flex-grow min-w-0">
-                      <span 
-                        className="inline-block w-3 h-3 rounded-full mr-2 flex-shrink-0"
-                        style={{ 
-                          backgroundColor: [
-                            '#3B82F6', '#10B981', '#8B5CF6', '#F59E0B', '#EC4899'
-                          ][index % 5] 
-                        }}
-                      ></span>
-                      <span className="text-sm truncate dark:text-gray-300">
-                        {service.serviceName}
-                      </span>
-                    </div>
-                    <div className="font-medium dark:text-white flex-shrink-0">
-                      {formatCurrency(service.amount)}
-                    </div>
+                <div>
+                  <div className={`text-sm font-medium ${
+                    theme.isDarkMode ? 'text-blue-300' : 'text-blue-700'
+                  }`}>
+                    {getCategoryName(selectedCategory)}
+                  </div>
+                  <div className={`text-2xl font-bold ${
+                    theme.isDarkMode ? 'text-white' : 'text-gray-900'
+                  }`}>
+                    {formatCurrency(totalAmount)}
                   </div>
                 </div>
-              ))}
+              </div>
+            </div>
+            
+            {/* Service List */}
+            <div className="space-y-3">
+              {expensesByService.map((service, index) => {
+                const percentage = totalAmount > 0 ? (service.amount / totalAmount) * 100 : 0;
+                return (
+                  <div 
+                    key={service.serviceId}
+                    className={`p-4 rounded-lg border transition-all duration-200 hover:shadow-md ${
+                      theme.isDarkMode ? 'bg-gray-700/30 border-gray-600 hover:bg-gray-700/50' : 'bg-gray-50 border-gray-200 hover:bg-gray-100'
+                    }`}
+                  >
+                    <div className="flex justify-between items-center mb-2">
+                      <div className="flex items-center gap-3">
+                        <span 
+                          className="w-4 h-4 rounded-full flex-shrink-0"
+                          style={{ backgroundColor: colorPalette[index % colorPalette.length] }}
+                        />
+                        <span className={`font-medium ${
+                          theme.isDarkMode ? 'text-gray-200' : 'text-gray-800'
+                        }`}>
+                          {service.serviceName}
+                        </span>
+                      </div>
+                      <div className="text-right">
+                        <div className={`font-bold ${
+                          theme.isDarkMode ? 'text-white' : 'text-gray-900'
+                        }`}>
+                          {formatCurrency(service.amount)}
+                        </div>
+                        <div className={`text-sm ${
+                          theme.isDarkMode ? 'text-gray-400' : 'text-gray-500'
+                        }`}>
+                          {percentage.toFixed(1)}%
+                        </div>
+                      </div>
+                    </div>
+                    {/* Progress bar */}
+                    <div className={`w-full bg-gray-200 rounded-full h-2 ${
+                      theme.isDarkMode ? 'bg-gray-600' : 'bg-gray-200'
+                    }`}>
+                      <div 
+                        className="h-2 rounded-full transition-all duration-500"
+                        style={{ 
+                          width: `${percentage}%`,
+                          backgroundColor: colorPalette[index % colorPalette.length]
+                        }}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
           
-          <div className="md:w-2/3 h-80">
-            <Doughnut data={chartData} options={chartOptions} id="service-breakdown-chart" />
+          {/* Right side - Chart */}
+          <div className="flex items-center justify-center">
+            <div className="relative w-80 h-80">
+              {expensesByService.length > 0 ? (
+                <>
+                  <Doughnut data={chartData} options={chartOptions} id="service-breakdown-chart" />
+                  {/* Center label */}
+                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                    <div className="text-center">
+                      <div className={`text-2xl font-bold ${
+                        theme.isDarkMode ? 'text-white' : 'text-gray-900'
+                      }`}>
+                        {formatCurrency(totalAmount)}
+                      </div>
+                      <div className={`text-sm ${
+                        theme.isDarkMode ? 'text-gray-400' : 'text-gray-500'
+                      }`}>
+                        Total Spend
+                      </div>
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <div className={`flex items-center justify-center h-full ${
+                  theme.isDarkMode ? 'text-gray-400' : 'text-gray-500'
+                }`}>
+                  <div className="text-center">
+                    <BarChart3 className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                    <p>No service data available</p>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>

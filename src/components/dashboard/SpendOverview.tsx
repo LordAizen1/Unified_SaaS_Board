@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { ChevronDown, ChevronUp, Download, TrendingDown, TrendingUp } from 'lucide-react';
+import { ChevronDown, ChevronUp, Download, TrendingDown, TrendingUp, DollarSign, Calendar, Target } from 'lucide-react';
 import { useFilters } from '../../context/FilterContext';
 import { useTheme } from '../../context/ThemeContext';
 import { calculateMoMChange, filterExpenses } from '../../utils/dataTransformers';
@@ -114,8 +114,6 @@ const SpendOverview: React.FC = () => {
       const awsEndDate = parseISO(awsCostSummary.timeRange.end);
 
       if (isValid(awsStartDate) && isValid(awsEndDate)) {
-        // Iterate through dates within the AWS cost summary time range
-        // and use the actual daily costs from awsCostSummary.costsByDate
         for (let d = new Date(awsStartDate); d <= awsEndDate; d.setDate(d.getDate() + 1)) {
           const dateString = format(d, 'yyyy-MM-dd');
           const dailyAwsServiceCosts = awsCostSummary.costsByDate[dateString];
@@ -130,7 +128,6 @@ const SpendOverview: React.FC = () => {
           if (dailyTotals[dateString] !== undefined) {
             dailyTotals[dateString] += dailyTotalAwsCost;
           } else if (d >= startDate && d <= endDate) { 
-            // Only add if within the selected filter range and not already initialized from mock data
             dailyTotals[dateString] = dailyTotalAwsCost;
           }
         }
@@ -158,6 +155,8 @@ const SpendOverview: React.FC = () => {
         fill: true,
         tension: 0.4,
         pointRadius: 0,
+        pointHoverRadius: 4,
+        borderWidth: 2,
       },
     ],
   };
@@ -170,7 +169,23 @@ const SpendOverview: React.FC = () => {
         display: false,
       },
       tooltip: {
-        enabled: false,
+        enabled: true,
+        backgroundColor: theme.isDarkMode ? '#1f2937' : '#ffffff',
+        titleColor: theme.isDarkMode ? '#f9fafb' : '#111827',
+        bodyColor: theme.isDarkMode ? '#d1d5db' : '#374151',
+        borderColor: theme.isDarkMode ? '#374151' : '#e5e7eb',
+        borderWidth: 1,
+        cornerRadius: 8,
+        displayColors: false,
+        callbacks: {
+          title: (context: any) => {
+            const date = new Date(context[0].label);
+            return format(date, 'MMM d, yyyy');
+          },
+          label: (context: any) => {
+            return `Spend: ${formatCurrency(context.raw)}`;
+          },
+        },
       },
     },
     scales: {
@@ -186,6 +201,10 @@ const SpendOverview: React.FC = () => {
         borderWidth: 2,
       },
     },
+    interaction: {
+      intersect: false,
+      mode: 'index' as const,
+    },
   };
   
   // Export chart as PNG
@@ -198,17 +217,22 @@ const SpendOverview: React.FC = () => {
       link.click();
     }
   };
+
+  // Calculate budget progress (mock data for demonstration)
+  const monthlyBudget = 50000; // $50k monthly budget
+  const budgetProgress = (totalSpend / monthlyBudget) * 100;
+  const isOverBudget = budgetProgress > 100;
   
   return (
-    <div className={`rounded-lg overflow-hidden shadow-sm ${
+    <div className={`rounded-xl overflow-hidden shadow-lg border ${
       theme.isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
-    } border transition-colors duration-200`}>
-      <div className="p-4 sm:p-6">
-        <div className="flex justify-between items-start mb-6">
+    } transition-all duration-200 hover:shadow-xl`}>
+      <div className="p-6 sm:p-8">
+        <div className="flex justify-between items-start mb-8">
           <div>
-            <h2 className={`text-lg font-semibold ${
+            <h2 className={`text-xl font-bold ${
               theme.isDarkMode ? 'text-white' : 'text-gray-900'
-            }`}>
+            } mb-2`}>
               Spend Overview
             </h2>
             <p className={`text-sm ${
@@ -220,72 +244,176 @@ const SpendOverview: React.FC = () => {
           
           <button
             onClick={exportChart}
-            className={`p-2 rounded-md ${
-              theme.isDarkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-100'
-            } transition-colors duration-150`}
+            className={`p-3 rounded-lg ${
+              theme.isDarkMode ? 'hover:bg-gray-700 text-gray-400 hover:text-gray-300' : 'hover:bg-gray-100 text-gray-500 hover:text-gray-600'
+            } transition-all duration-150`}
             aria-label="Export chart"
           >
-            <Download size={16} />
+            <Download size={18} />
           </button>
         </div>
         
-        <div className="flex flex-col md:flex-row gap-6 items-center">
-          <div className="flex-1">
-            <div className={`text-4xl font-bold ${
-              theme.isDarkMode ? 'text-white' : 'text-gray-900'
-            } mb-2`}>
-              {formatCurrency(totalSpend)}
-            </div>
-            <div className="flex items-center text-sm mb-4">
-              {momChange.percentageChange !== 0 && (
-                <span className={`flex items-center mr-2 ${
-                  momChange.percentageChange > 0 ? 'text-red-500' : 'text-green-500'
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
+          {/* Left side - Metrics */}
+          <div className="space-y-6">
+            {/* Main spend amount */}
+            <div className="space-y-3">
+              <div className="flex items-center gap-3">
+                <div className={`p-3 rounded-lg ${
+                  theme.isDarkMode ? 'bg-blue-500/20' : 'bg-blue-50'
                 }`}>
-                  {momChange.percentageChange > 0 ? <TrendingUp size={16} /> : <TrendingDown size={16} />}
-                  <span className="ml-1">{Math.abs(momChange.percentageChange).toFixed(1)}%</span>
-                </span>
+                  <DollarSign className={`w-6 h-6 ${
+                    theme.isDarkMode ? 'text-blue-400' : 'text-blue-600'
+                  }`} />
+                </div>
+                <div>
+                  <p className={`text-sm font-medium ${
+                    theme.isDarkMode ? 'text-gray-400' : 'text-gray-500'
+                  }`}>
+                    Total Spend
+                  </p>
+                  <div className={`text-4xl font-bold ${
+                    theme.isDarkMode ? 'text-white' : 'text-gray-900'
+                  }`}>
+                    {formatCurrency(totalSpend)}
+                  </div>
+                </div>
+              </div>
+              
+              {/* MoM Change */}
+              {momChange.percentageChange !== 0 && (
+                <div className="flex items-center gap-2">
+                  <div className={`flex items-center gap-1 px-3 py-1 rounded-full text-sm font-medium ${
+                    momChange.percentageChange > 0 
+                      ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
+                      : 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                  }`}>
+                    {momChange.percentageChange > 0 ? <TrendingUp size={14} /> : <TrendingDown size={14} />}
+                    <span>{Math.abs(momChange.percentageChange).toFixed(1)}%</span>
+                  </div>
+                  <span className={`text-sm ${
+                    theme.isDarkMode ? 'text-gray-400' : 'text-gray-500'
+                  }`}>
+                    vs last month ({formatCurrency(momChange.previousMonth)})
+                  </span>
+                </div>
               )}
-              <span className={`${theme.isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-                vs previous month ({formatCurrency(momChange.previousMonth)})
-              </span>
+            </div>
+
+            {/* Budget Progress */}
+            <div className={`p-4 rounded-lg border ${
+              theme.isDarkMode ? 'bg-gray-700/50 border-gray-600' : 'bg-gray-50 border-gray-200'
+            }`}>
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <Target className={`w-4 h-4 ${
+                    theme.isDarkMode ? 'text-gray-400' : 'text-gray-500'
+                  }`} />
+                  <span className={`text-sm font-medium ${
+                    theme.isDarkMode ? 'text-gray-300' : 'text-gray-700'
+                  }`}>
+                    Monthly Budget
+                  </span>
+                </div>
+                <span className={`text-sm font-medium ${
+                  isOverBudget 
+                    ? 'text-red-600 dark:text-red-400' 
+                    : 'text-green-600 dark:text-green-400'
+                }`}>
+                  {budgetProgress.toFixed(1)}%
+                </span>
+              </div>
+              <div className={`w-full bg-gray-200 rounded-full h-2 ${
+                theme.isDarkMode ? 'bg-gray-600' : 'bg-gray-200'
+              }`}>
+                <div 
+                  className={`h-2 rounded-full transition-all duration-300 ${
+                    isOverBudget 
+                      ? 'bg-red-500' 
+                      : budgetProgress > 80 
+                        ? 'bg-yellow-500' 
+                        : 'bg-green-500'
+                  }`}
+                  style={{ width: `${Math.min(budgetProgress, 100)}%` }}
+                />
+              </div>
+              <div className="flex justify-between mt-1">
+                <span className={`text-xs ${
+                  theme.isDarkMode ? 'text-gray-400' : 'text-gray-500'
+                }`}>
+                  {formatCurrency(totalSpend)}
+                </span>
+                <span className={`text-xs ${
+                  theme.isDarkMode ? 'text-gray-400' : 'text-gray-500'
+                }`}>
+                  {formatCurrency(monthlyBudget)}
+                </span>
+              </div>
             </div>
             
             <button
               onClick={() => setShowDetails(!showDetails)}
-              className={`text-sm font-medium flex items-center ${
+              className={`text-sm font-medium flex items-center gap-2 ${
                 theme.isDarkMode ? 'text-blue-400 hover:text-blue-300' : 'text-blue-600 hover:text-blue-700'
-              }`}
+              } transition-colors duration-150`}
             >
-              View Details {showDetails ? <ChevronUp size={16} className="ml-1" /> : <ChevronDown size={16} className="ml-1" />}
+              <Calendar size={16} />
+              View Details 
+              {showDetails ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
             </button>
 
             {showDetails && (
-              <div className={`mt-6 p-4 rounded-md ${
-                theme.isDarkMode ? 'bg-gray-700' : 'bg-gray-100'
+              <div className={`p-4 rounded-lg border ${
+                theme.isDarkMode ? 'bg-gray-700/30 border-gray-600' : 'bg-gray-50 border-gray-200'
               }`}>
                 <h3 className={`text-md font-semibold mb-3 ${
                   theme.isDarkMode ? 'text-white' : 'text-gray-800'
                 }`}>
-                  Additional Spend Metrics
+                  Spend Breakdown
                 </h3>
-                <ul className={`text-sm space-y-2 ${
+                <div className={`space-y-3 text-sm ${
                   theme.isDarkMode ? 'text-gray-300' : 'text-gray-600'
                 }`}>
-                  <li>Mock Data Total: {formatCurrency(filteredExpenses.reduce((sum, e) => sum + e.amount, 0))}</li>
-                  <li>AWS Total Cost: {awsCostSummary ? formatCurrency(awsCostSummary.totalCost) : 'N/A'}</li>
-                  <li>AWS Time Period: {awsCostSummary && awsCostSummary.timeRange.start && awsCostSummary.timeRange.end
-                    ? `${formatDate(awsCostSummary.timeRange.start)} - ${formatDate(awsCostSummary.timeRange.end)}`
-                    : 'N/A'
-                  }</li>
-                  {awsLoading && <li>Loading AWS costs...</li>}
-                  {awsError && <li className="text-red-400">Error fetching AWS costs: {awsError}</li>}
-                </ul>
+                  <div className="flex justify-between">
+                    <span>Mock Data Total:</span>
+                    <span className="font-medium">{formatCurrency(filteredExpenses.reduce((sum, e) => sum + e.amount, 0))}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>AWS Total Cost:</span>
+                    <span className="font-medium">{awsCostSummary ? formatCurrency(awsCostSummary.totalCost) : 'N/A'}</span>
+                  </div>
+                  {awsCostSummary && (
+                    <div className="flex justify-between">
+                      <span>AWS Period:</span>
+                      <span className="font-medium">
+                        {awsCostSummary.timeRange.start && awsCostSummary.timeRange.end
+                          ? `${formatDate(awsCostSummary.timeRange.start)} - ${formatDate(awsCostSummary.timeRange.end)}`
+                          : 'N/A'
+                        }
+                      </span>
+                    </div>
+                  )}
+                  {awsLoading && (
+                    <div className="flex items-center gap-2">
+                      <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+                      <span>Loading AWS costs...</span>
+                    </div>
+                  )}
+                  {awsError && (
+                    <div className="text-red-400 text-xs">
+                      Error: {awsError}
+                    </div>
+                  )}
+                </div>
               </div>
             )}
           </div>
           
-          <div className="flex-1 h-40">
-            <div className="h-32">
+          {/* Right side - Chart */}
+          <div className="h-48 relative">
+            <div className={`absolute inset-0 rounded-lg ${
+              theme.isDarkMode ? 'bg-gray-700/20' : 'bg-gray-50'
+            }`}>
               <Line id="spend-trend-chart" data={chartData} options={chartOptions} />
             </div>
           </div>
